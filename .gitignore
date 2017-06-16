@@ -1,0 +1,9 @@
+# Created by .ignore support plugin (hsz.mobi)
+*.pyc
+doc/
+.idea
+.cache
+temporary
+build
+pyRCDs.egg-info
+pyrcds/visualize.py
