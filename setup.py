@@ -4,11 +4,8 @@ exec(open('version.py').read())
 
 setup(
     name='pyRCDs',
-    packages=['pyrcds'],
+    packages=['pyrcds', 'pyrcds.tests'],
     version=__version__,
     author='Sanghack Lee',
-    author_email='sanghack.lee@gmail.com',
-
+    author_email='sanghack.lee@gmail.com'
 )
-#  python setup.py build_ext --inplace
-#  pip install -e .
