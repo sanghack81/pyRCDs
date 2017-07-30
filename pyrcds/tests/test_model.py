@@ -9,7 +9,6 @@ from pyrcds.model import RelationalPath, llrsp, eqint, RelationalVariable, termi
     canonical_rvars, linear_gaussians_rcm, generate_values_for_skeleton, flatten, generate_rpath, is_valid_rpath
 from pyrcds.tests.testing_utils import EPBDF, company_schema, company_rcm, company_skeleton, company_deps
 from pyrcds.utils import between_sampler
-from sdcit.utils import random_seeds
 
 
 def test_rpath_0():
@@ -259,6 +258,14 @@ def test_generate_rpaths():
         for __ in range(100):
             rpath = generate_rpath(schema, length=np.random.randint(1, 15))
             assert is_valid_rpath([i for i in rpath])
+
+
+def random_seeds(n=None):
+    """Random seeds of given size or a random seed if n is None"""
+    if n is None:
+        return np.random.randint(np.iinfo(np.int32).max)
+    else:
+        return [np.random.randint(np.iinfo(np.int32).max) for _ in range(n)]
 
 
 def test_data_gen():
