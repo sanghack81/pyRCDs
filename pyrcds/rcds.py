@@ -132,10 +132,10 @@ def co_intersectible(Q: RelationalPath, R: RelationalPath, P: RelationalPath, P_
     __validate_rpath(R)
     __validate_rpath(P)
     __validate_rpath(P_prime)
-    check = Q.terminal == R.base and \
-            Q.base == P.base == P_prime.base and \
-            R.terminal == P.terminal == P_prime.terminal and \
-            intersectible(P, P_prime)
+    check = (Q.terminal == R.base and
+             Q.base == P.base == P_prime.base and
+             R.terminal == P.terminal == P_prime.terminal and
+             intersectible(P, P_prime))
     if not check:
         raise ValueError('not a valid arguments: {}'.format([Q, R, P, P_prime]))
 

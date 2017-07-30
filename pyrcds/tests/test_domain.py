@@ -55,7 +55,15 @@ def test_EDPDE():
     assert str(company_schema) == 'RSchema(BizUnit, Develops, Employee, Funds, Product)'
     # print(repr(company_schema))
     assert repr(
-        company_schema) == "RSchema(Entity classes: [BizUnit(Budget, Revenue), Employee(Competence, Salary), Product(Success)], Relationship classes: [Develops(dummy1, dummy2, {Employee: many, Product: many}), Funds((), {BizUnit: many, Product: one})])"
+        company_schema) == "RSchema(Entity classes: [" \
+                           "BizUnit(Budget, Revenue), " \
+                           "Employee(Competence, Salary), " \
+                           "Product(Success)" \
+                           "], " \
+                           "Relationship classes: [" \
+                           "Develops(dummy1, dummy2, {Employee: many, Product: many}), " \
+                           "Funds((), {BizUnit: many, Product: one})" \
+                           "])"
 
     # e2 = E.removed({A_Class('Salary'), })
     # d2 = D.removed({A_Class('dummy1'), E})
