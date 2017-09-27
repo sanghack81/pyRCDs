@@ -6,7 +6,7 @@ from itertools import takewhile, count, combinations
 
 import networkx as nx
 
-from pyrcds.domain import RelationalSkeleton, RelationalSchema, SkItem, RelationshipClass, EntityClass
+from pyrcds.domain import RelationalSkeleton, RelationalSchema, SkItem
 from pyrcds.graphs import PDAG
 from pyrcds.model import RelationalDependency, PRCM, llrsp, RelationalVariable, eqint, RelationalPath, RCM, UndirectedRDep, SymTriple, enumerate_rvars, \
     enumerate_rdeps
@@ -379,7 +379,7 @@ class AbstractRCD:
                         to_remove.add(UndirectedRDep(dep))
                 else:
                     if truth and len(truth.pa(effect)) == d and cause not in truth.pa(effect) and \
-                                    cause.attr not in truth.class_dependency_graph.de(effect.attr):
+                            cause.attr not in truth.class_dependency_graph.de(effect.attr):
                         if self.verbose:
                             print('False positive: {}'.format(dep))
                         deps_to_be_tested -= {dep, reversed(dep)}
@@ -651,7 +651,7 @@ def anchors_to_skeleton(schema: RelationalSchema, P: RelationalPath, Q: Relation
                 temp_g.add_edge(v, aux)
 
     skeleton = RelationalSkeleton(schema, True)
-    entities = list(filter(lambda vv: vv.item_class.is_entity_class , temp_g.nodes()))
+    entities = list(filter(lambda vv: vv.item_class.is_entity_class, temp_g.nodes()))
     relationships = list(filter(lambda vv: vv.item_class.is_relationship_class, temp_g.nodes()))
     skeleton.add_entities(*entities)
     for r in relationships:
