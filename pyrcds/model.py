@@ -466,6 +466,7 @@ class PRCM:
         """
 
         cdg = PDAG()
+        cdg.add_nodes(self.schema.attrs)
         cdg.add_edges((cause.attr, effect.attr) for effect, causes in self.parents.items() for cause in causes)
         cdg.add_undirected_edges((k.attr, v.attr) for k, vs in self.neighbors.items() for v in vs)
 
