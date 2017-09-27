@@ -86,6 +86,7 @@ class ItemClass(SchemaElement):
 
         super().__init__(name)
         self.attrs = frozenset(attrs)
+        self.attribute_classes = self.attrs
 
     @property
     def is_entity_class(self):
@@ -130,6 +131,7 @@ class RelationshipClass(ItemClass):
         super().__init__(name, attrs)
         self.__cards = cards.copy()
         self.entities = frozenset(self.__cards.keys())
+        self.entity_classes = self.entities
 
     def __contains__(self, item):
         """Whether an entity class participates in this relationship class"""
@@ -197,6 +199,8 @@ class RelationalSchema:
 
         self.entities = frozenset(entities)
         self.relationships = frozenset(relationships)
+        self.entity_classes = self.entities
+        self.relationship_classes = self.relationships
         self.item_classes = self.entities | self.relationships
         self.attrs = frozenset(chain(*[i.attrs for i in chain(entities, relationships)]))
 
