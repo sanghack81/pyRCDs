@@ -706,6 +706,10 @@ class SkeletonDataInterface:
                     inner_data[i] = tuple((item, item[rvar.attr]) for item in terminal)
         return inner_data
 
+    def fetch_singleton(self, rvar: RelationalVariable):
+        assert rvar.is_canonical
+        return np.array([next(iter(terminal_set(self.skeleton, rvar.rpath, b)))[rvar.attr] for b in self.base_items[rvar.base]])
+
 
 class GroundGraph:
     """Ground graph"""
