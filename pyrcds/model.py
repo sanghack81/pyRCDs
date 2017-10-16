@@ -202,7 +202,6 @@ def llrsp(p1: RelationalPath, p2: RelationalPath) -> int:
     return min(len(p1), len(p2))
 
 
-
 def eqint(p1: RelationalPath, p2: RelationalPath):
     """Equal or intersectible"""
     if (p1.base, p1.terminal) != (p2.base, p2.terminal):
