@@ -178,6 +178,10 @@ class RelationalPath:
     def __repr__(self):
         return str(self)
 
+    @property
+    def is_many(self):
+        return llrsp(self, self) < len(self)
+
 
 def llrsp(p1: RelationalPath, p2: RelationalPath) -> int:
     """Longest Length of Required Shared Path
@@ -196,6 +200,7 @@ def llrsp(p1: RelationalPath, p2: RelationalPath) -> int:
         prev = x
 
     return min(len(p1), len(p2))
+
 
 
 def eqint(p1: RelationalPath, p2: RelationalPath):
@@ -556,9 +561,6 @@ class RCM(PRCM):
     def add(self, d):
         assert not isinstance(d, UndirectedRDep)
         super().add(d)
-
-        # def is_non_descendant(self, x, y):
-        #     self.class_dependency_graph
 
 
 class ParamRCM(RCM):

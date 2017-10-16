@@ -1,4 +1,5 @@
 import collections
+import typing
 
 import networkx as nx
 
@@ -21,7 +22,7 @@ class PDAG:
     def __bool__(self):
         return bool(self.vertices())
 
-    def vertices(self):
+    def vertices(self) -> typing.Set:
         return set(self._Pa.keys()) | set(self._Ch.keys()) | self.aux_vert
 
     def __iter__(self):
@@ -30,7 +31,7 @@ class PDAG:
     def __contains__(self, item):
         return item in self.E or item in self.vertices()
 
-    def an(self, x, at=None):
+    def an(self, x, at=None) -> typing.Set:
         """Ancestors of x"""
         if at is None:
             at = set()
@@ -42,7 +43,7 @@ class PDAG:
 
         return at
 
-    def de(self, x, at=None):
+    def de(self, x, at=None) -> typing.Set:
         """Descendants of x"""
         if at is None:
             at = set()
@@ -54,7 +55,7 @@ class PDAG:
 
         return at
 
-    def oriented(self):
+    def oriented(self) -> typing.Set:
         """all oriented edges"""
         ors = set()
         for x, y in self.E:
@@ -62,7 +63,7 @@ class PDAG:
                 ors.add((x, y))
         return ors
 
-    def unoriented(self):
+    def unoriented(self) -> typing.Set:
         """all unoriented edges"""
         uors = set()
         for x, y in self.E:
@@ -88,7 +89,7 @@ class PDAG:
         if v in self.aux_vert:
             self.aux_vert.remove(v)
 
-    def copy(self):
+    def copy(self) -> 'PDAG':
         new_copy = PDAG()
         new_copy.E = set(self.E)
         new_copy._Pa = collections.defaultdict(set)
@@ -109,7 +110,7 @@ class PDAG:
         for x, y in zip(iterable, iterable[1:]):
             self.add_undirected_edge(x, y)
 
-    def is_adj(self, x, y):
+    def is_adj(self, x, y) -> bool:
         return (x, y) in self.E or (y, x) in self.E
 
     def add_edges(self, xys):
@@ -143,10 +144,10 @@ class PDAG:
         self.add_edge(x, y)
         self.add_edge(y, x)
 
-    def orients(self, xys):
+    def orients(self, xys) -> bool:
         return any([self.orient(x, y) for x, y in xys])
 
-    def orient(self, x, y):
+    def orient(self, x, y) -> bool:
         """Orient an undirected edge to directed edge x-->y
 
         Returns
@@ -161,44 +162,74 @@ class PDAG:
                 return True
         return False
 
-    def is_oriented_as(self, x, y):
+    def is_oriented_as(self, x, y) -> bool:
         return (x, y) in self.E and (y, x) not in self.E
 
-    def is_unoriented(self, x, y):
+    def is_unoriented(self, x, y) -> bool:
         return (x, y) in self.E and (y, x) in self.E
 
-    def is_oriented(self, x, y):
+    def is_oriented(self, x, y) -> bool:
         """Returns true if there exists a directed edge between x and y without orientation (i.e., x-->y or x<--y)."""
         return ((x, y) in self.E) ^ ((y, x) in self.E)
 
-    def ne(self, x):
+    def ne(self, x) -> typing.Set:
         """Neighbors -- connected through an undirected edge"""
         return self._Pa[x] & self._Ch[x]
 
-    def adj(self, x):
+    def adj(self, x) -> typing.Set:
         """Adjacencies -- connected through an (un)directed edge"""
         return self._Pa[x] | self._Ch[x]
 
     # get parents
-    def pa(self, x):
+    def pa(self, x) -> typing.Set:
         """Parents -- connected through a directed edge towards x"""
         return self._Pa[x] - self._Ch[x]
 
     # get children
-    def ch(self, x):
+    def ch(self, x) -> typing.Set:
         """Children -- connected through a directed edge from x"""
         return self._Ch[x] - self._Pa[x]
 
-    def as_networkx_dag(self):
+    def as_networkx_dag(self) -> nx.DiGraph:
         assert len(self.unoriented()) == 0
         dg = nx.DiGraph()
         dg.add_nodes_from(self.aux_vert)
         dg.add_edges_from(self.oriented())
         return dg
 
-    def as_networkx_ug(self):
+    def as_networkx_ug(self) -> nx.Graph:
         assert len(self.oriented()) == 0
         ug = nx.Graph()
         ug.add_nodes_from(self.aux_vert)
         ug.add_edges_from(self.unoriented())
         return ug
+
+    def dag_admission(self) -> bool:
+        """ Whether there might exists a DAG admitting current PDAG """
+        from itertools import combinations
+
+        pdag = self.copy()
+        changed = True
+        while changed:
+            changed = False
+            for y in pdag:
+                for x, z in combinations(pdag.adj(y), 2):
+                    if pdag.is_oriented_as(x, y) and pdag.is_oriented_as(y, z):  # X-->Y-->Z
+                        if not pdag.is_adj(x, z):
+                            pdag.add_edge(x, z)
+                            changed = True
+                        elif pdag.is_unoriented(x, z):
+                            pdag.orient(x, z)
+                            changed = True
+                        elif pdag.is_oriented_as(z, x):
+                            return False
+                    elif pdag.is_oriented_as(z, y) and pdag.is_oriented_as(y, x):
+                        if not pdag.is_adj(z, x):
+                            pdag.add_edge(z, x)
+                            changed = True
+                        elif pdag.is_unoriented(z, x):
+                            pdag.orient(z, x)
+                            changed = True
+                        elif pdag.is_oriented_as(x, z):
+                            return False
+        return True
