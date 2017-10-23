@@ -2,13 +2,13 @@ from itertools import combinations
 
 import numpy as np
 
-from pyrcds.domain import generate_schema
+from pyrcds.domain import generate_schema, RelationalSchema, Cardinality, RelationshipClass, EntityClass
 from pyrcds.graphs import PDAG
 from pyrcds.model import generate_rcm, RelationalPath, RelationalVariable, SymTriple, UndirectedRDep, is_valid_rpath, enumerate_rpaths, \
     enumerate_rdeps, enumerate_rvars
 from pyrcds.rcds import interner, extend, intersectible, UnvisitedQueue, AbstractGroundGraph, sound_rules, completes, \
     d_separated, \
-    RpCD, markov_equivalence, CITester, CITestResult
+    RpCD, markov_equivalence, CITester, CITestResult, co_intersectible, new_extend
 from pyrcds.tests.testing_utils import company_rcm, company_schema, EPBDF
 
 
@@ -281,3 +281,46 @@ def test_rpcd_markov_equivalence():
         assert phase_i_uds == to_uds
         rpcd.phase_II()
         assert markov_equivalence(rcm).directed_dependencies == rpcd.prcm.directed_dependencies
+
+
+def test_extend_example():
+    print()
+    E1 = EntityClass('E1')
+    E2 = EntityClass('E2')
+    E3 = EntityClass('E3')
+    E4 = EntityClass('E4')
+    Ra = RelationshipClass('Ra', set(), {E1: Cardinality.many, E2: Cardinality.many})
+    Rb = RelationshipClass('Rb', set(), {E2: Cardinality.many, E3: Cardinality.many})
+    Rc = RelationshipClass('Rc', set(), {E2: Cardinality.many, E4: Cardinality.many})
+
+    P = RelationalPath([E1, Ra, E2, Rb, E3])
+    Q = RelationalPath([E3, Rb, E2, Rc, E4])
+    extend1 = RelationalPath([E1, Ra, E2, Rb, E3, Rb, E2, Rc, E4])
+    extend3 = RelationalPath([E1, Ra, E2, Rc, E4])
+    assert {extend1, extend3} == set(extend(P, Q))
+
+    print()
+    Rb = RelationshipClass('Rb', set(), {E2: Cardinality.many, E3: Cardinality.one})
+    P = RelationalPath([E1, Ra, E2, Rb, E3])
+    Q = RelationalPath([E3, Rb, E2, Rc, E4])
+    assert {extend3} == set(extend(P, Q))
+
+
+def test_co_intersectable_example():
+    print()
+    Ij, Ik, B, E1, E2, E3 = entities = [EntityClass(name) for name in ['Ij', 'Ik', 'B', 'E1', 'E2', 'E3']]
+    R1 = RelationshipClass('R1', set(), {B: Cardinality.one, E1: Cardinality.one})
+    R2 = RelationshipClass('R2', set(), {E1: Cardinality.one, E3: Cardinality.one})
+    R3 = RelationshipClass('R3', set(), {E1: Cardinality.one, E2: Cardinality.one})
+    R4 = RelationshipClass('R4', set(), {E2: Cardinality.one, E3: Cardinality.one, Ik: Cardinality.one})
+    R5 = RelationshipClass('R5', set(), {Ik: Cardinality.one, Ij: Cardinality.one})
+
+    Q = RelationalPath([B, R1, E1, R2, E3, R4, Ik, R5, Ij])
+    R = RelationalPath([Ij, R5, Ik, R4, E3, R2, E1, R3, E2, R4, Ik])
+    P = RelationalPath([B, R1, E1, R3, E2, R4, Ik])
+    P_prime = RelationalPath([B, R1, E1, R2, E3, R4, Ik])
+    schema = RelationalSchema(entities, [R1, R2, R3, R4, R5])
+    assert P in set(extend(Q, R))
+    assert P in set(new_extend(Q, R))
+    assert intersectible(P, P_prime)
+    assert not co_intersectible(Q, R, P, P_prime, schema)
