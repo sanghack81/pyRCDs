@@ -6,7 +6,7 @@ from itertools import takewhile, count, combinations
 
 import networkx as nx
 
-from pyrcds.domain import RelationalSkeleton, RelationalSchema, SkItem
+from pyrcds.domain import RelationalSkeleton, RelationalSchema, SkItem, ItemClass
 from pyrcds.graphs import PDAG
 from pyrcds.model import RelationalDependency, PRCM, llrsp, RelationalVariable, eqint, RelationalPath, RCM, UndirectedRDep, SymTriple, enumerate_rvars, \
     enumerate_rdeps
@@ -47,7 +47,10 @@ class CITestResult:
         return self.ci
 
     def __str__(self):
-        return "{}: {} with p={:.4f}".format(self.query, "independent" if self.ci else "dependent", self.p)
+        if self.p is not None:
+            return "{}: {} with p={:.4f}".format(self.query, "independent" if self.ci else "dependent", self.p)
+        else:
+            return "{}: {}".format(self.query, "independent" if self.ci else "dependent")
 
 
 class CITester:
@@ -117,32 +120,98 @@ def intersectible(P: RelationalPath, Q: RelationalPath):
         len(P), len(Q))
 
 
-def co_intersectible(Q: RelationalPath, R: RelationalPath, P: RelationalPath, P_prime: RelationalPath):
-    """See [1] for the description of co-intersectible.
+def co_intersectible(Q: RelationalPath, R: RelationalPath, P: RelationalPath, P_prime: RelationalPath, schema: RelationalSchema = None):
+    assert Q.base == P.base == P_prime.base
+    assert Q.terminal == R.base
+    assert R.terminal == P.terminal == P_prime.terminal
+    assert intersectible(P, P_prime)
 
-    References
-    ----------
-    [1] Sanghack Lee and Vasant Honavar (2015),
-        Lifted Representation of Relational Causal Models Revisited:
-        Implications for Reasoning and Structure Learning,
-        In Proceedings of Workshop on Advances in Causal Inference co-located with UAI 2015
-    """
+    offset = 0
+    p_items = list(range(len(P)))
+    offset += len(P)
+    q_items = list(range(offset, offset + len(Q)))
+    offset += len(Q)
+    p2_items = list(range(offset, offset + len(P_prime)))
+    offset += len(P_prime)
+    r_items = list(range(offset, offset + len(R)))
 
-    __validate_rpath(Q)
-    __validate_rpath(R)
-    __validate_rpath(P)
-    __validate_rpath(P_prime)
-    check = (Q.terminal == R.base and
-             Q.base == P.base == P_prime.base and
-             R.terminal == P.terminal == P_prime.terminal and
-             intersectible(P, P_prime))
-    if not check:
-        raise ValueError('not a valid arguments: {}'.format([Q, R, P, P_prime]))
+    paths = [p_items, q_items, p2_items, r_items]
 
-    ll = 1 + (len(Q) + len(R) - 1 - len(P)) // 2
-    Qm, Rp = Q[:len(Q) - ll], R[ll - 1:]
-    l1, l2 = llrsp(Q, P_prime), llrsp(reversed(R), reversed(P_prime))
-    return (l1 < len(Qm) or l2 < len(Rp)) and l1 + l2 <= len(P_prime)
+    # TODO not efficient. can take advantage of (set, list) combined structure.
+    def merge(item_to_keep, item_to_be_replaced):
+        if item_to_keep == item_to_be_replaced:
+            return True
+        if any(item_to_keep in path and item_to_be_replaced in path for path in paths):
+            return False
+        for path in paths:
+            if item_to_be_replaced in path:
+                path[path.index(item_to_be_replaced)] = item_to_keep
+
+        assert all(len(set(path)) == len(path) for path in paths)  # time consuming checking ...
+        return True
+
+    items_of = {'P': p_items, 'P_prime': p2_items, 'Q': q_items, 'R': r_items}
+    rpaths = {'P': P, 'P_prime': P_prime, 'Q': Q, 'R': R}
+    for A, B in combinations(('P', 'P_prime', 'Q'), 2):
+        if not all(merge(items_of[A][i], items_of[B][i]) for i in range(llrsp(rpaths[A], rpaths[B]))):
+            return False
+    for A, B in combinations(('P', 'P_prime', 'R'), 2):
+        if not all(merge(items_of[A][-1 - i], items_of[B][-1 - i]) for i in range(llrsp(reversed(rpaths[A]), reversed(rpaths[B])))):
+            return False
+
+    if not all(merge(q_items[-1 - i], r_items[i]) for i in range(llrsp(reversed(Q), R))):
+        return False
+
+    item_class_of = dict()
+    for rpath_name in ['P', 'P_prime', 'Q', 'R']:
+        rpath = rpaths[rpath_name]
+        items = items_of[rpath_name]
+        item_class_of.update({item: rpath[at] for at, item in enumerate(items)})
+
+    to_merges = True
+    while to_merges:
+        # refresh adjacent information
+        adjacencies = defaultdict(set)
+        for rpath_name in ['P', 'P_prime', 'Q', 'R']:
+            items = items_of[rpath_name]
+            for i, j in zip(items, items[1:]):
+                adjacencies[i].add(j)
+                adjacencies[j].add(i)
+
+        # examine cardinality
+        to_merges = list()
+        for item, neighbors in adjacencies.items():
+            item_class = item_class_of[item]
+            neighbors = list(neighbors)
+            for neighbor_item_class, neighbors_of_item_class in group_by(neighbors, lambda ne: item_class_of[ne]):
+                if len(neighbors_of_item_class) > 1:
+                    if item_class.is_relationship_class:  # R--one E
+                        to_merges.append(list(neighbors_of_item_class))
+                    elif not neighbor_item_class.is_many(item_class):  # E -- neighbor R
+                        to_merges.append(list(neighbors_of_item_class))
+
+        for to_merge in to_merges:
+            if not all(merge(to_merge[0], to_merge[i]) for i in range(1, len(to_merge))):
+                return False
+
+    # verify
+    if schema:
+        skeleton = RelationalSkeleton(schema, False)  # allow missing entities
+        skitems = dict()
+        for item, neighbors in adjacencies.items():
+            item_class = item_class_of[item]  # type: ItemClass
+            if item_class.is_entity_class:
+                skitems[item] = SkItem(str(item), item_class)
+                skeleton.add_entity(skitems[item])
+        for item, neighbors in adjacencies.items():
+            item_class = item_class_of[item]  # type: ItemClass
+            if item_class.is_relationship_class:
+                skitems[item] = SkItem(str(item), item_class)
+                entities = [skitems[ne] for ne in adjacencies[item]]
+
+                skeleton.add_relationship(skitems[item], entities)
+
+    return True
 
 
 class UnvisitedQueue:
@@ -249,7 +318,7 @@ class AbstractGroundGraph(CITester):
             for RxVy in filter(lambda d: d.effect.attr == Y, rcm.directed_dependencies):
                 for Qy in Qys:
                     Q, (R, X) = Qy.rpath, RxVy.cause
-                    for P in filter(lambda p: p.hop_len <= h, extend(Q, R)):
+                    for P in filter(lambda p: p.hop_len <= h, new_extend(Q, R)):
                         Px = c1[RelationalVariable(P, X)]
                         self.RVEs.add((Px, Qy))  # P.X --> Q.Y
 
@@ -290,7 +359,7 @@ class AbstractGroundGraph(CITester):
         assert x != y
         assert x not in zs and y not in zs
         assert len({x.base, y.base} | {z.base for z in zs}) == 1
-        assert y.is_canonical
+        # assert y.is_canonical
 
         query = CIQuery(x, y, zs)
         zs_bar = unions(self.extend[z] for z in zs)
@@ -888,8 +957,40 @@ def markov_equivalent(model1: RCM, model2: RCM):
     return markov_equivalence(model1) == markov_equivalence(model2)
 
 
-def new_extend(P: RelationalPath, Q: RelationalPath, with_anchors=False):
-    return list(new_extend_iter(P, Q, with_anchors))
+def new_extend(P: RelationalPath, Q: RelationalPath):
+    return list(set(new_extend_iter2(P, Q)))
+
+
+def new_extend_iter2(P: RelationalPath, Q: RelationalPath):
+    """Relationship after joining P and Q, from the perspective of item class of X except the item class of X itself"""
+    LL = llrsp
+
+    m, n = len(P), len(Q)
+    l = LL(reversed(P), Q)
+    a_x, b_x = m - l, l - 1
+
+    # A set of candidate anchors
+    J = set()
+    for a in range(a_x + 1):  # 0 <= <= a_x
+        for b in range(b_x, n):  # b_x <=  <= |Q|
+            if P[a] == Q[b]:
+                J.add((a, b))
+
+    # the first characteristic anchor (a_r,b_r)
+    for a_r, b_r in J:
+        if not (LL(P[:a_r:-1], Q[b_r:]) == LL(P[a_r:], Q[b_r:]) == 1):
+            continue
+        if not joinable(P[:a_r], Q[b_r:]):
+            continue
+        Rr = P[:a_r] ** Q[b_r:]
+
+        l_alpha = LL(Q[b_x:b_r:-1], P[:a_r:-1])
+        if l_alpha == 1:
+            if eqint(P[a_r:a_x], Q[b_x:b_r:-1]):
+                yield Rr
+
+        elif l_alpha < b_r - b_x + 1 and a_r < a_x and b_x < b_r:
+            yield Rr
 
 
 def new_extend_iter(P: RelationalPath, Q: RelationalPath, with_anchors=False):

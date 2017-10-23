@@ -2,13 +2,13 @@ from itertools import combinations
 
 import numpy as np
 
-from pyrcds.domain import generate_schema, RelationshipClass, EntityClass, Cardinality
+from pyrcds.domain import generate_schema
 from pyrcds.graphs import PDAG
 from pyrcds.model import generate_rcm, RelationalPath, RelationalVariable, SymTriple, UndirectedRDep, is_valid_rpath, enumerate_rpaths, \
     enumerate_rdeps, enumerate_rvars
 from pyrcds.rcds import interner, extend, intersectible, UnvisitedQueue, AbstractGroundGraph, sound_rules, completes, \
     d_separated, \
-    co_intersectible, RpCD, markov_equivalence, CITester, CITestResult
+    RpCD, markov_equivalence, CITester, CITestResult
 from pyrcds.tests.testing_utils import company_rcm, company_schema, EPBDF
 
 
@@ -91,42 +91,6 @@ def test_intersectible():
     assert not intersectible(RelationalPath([E, D, P, F, B, F, P]), RelationalPath([E, D, P, D, E]))
     assert not intersectible(RelationalPath([D, P, F, B, F, P]), RelationalPath([E, D, P, D, E]))
     assert not intersectible(RelationalPath([E]), RelationalPath([E, D, P, D, E]))
-
-
-def test_co_intersectible():
-    # Example 1, Figure 5, in Lee and Honavar 2015 UAI workshop
-    Ij, Ik, B, E1, E2, E3 = [EntityClass(e, ()) for e in ["Ij", "Ik", "B", "E1", "E2", "E3"]]
-    R1, R2, R3, R4, R5 = [RelationshipClass("R1", (), {B: Cardinality.one, E1: Cardinality.one}),
-                          RelationshipClass("R2", (), {E1: Cardinality.one, E3: Cardinality.one}),
-                          RelationshipClass("R3", (), {E1: Cardinality.one, E2: Cardinality.one}),
-                          RelationshipClass("R4", (), {E2: Cardinality.one, E3: Cardinality.one, Ik: Cardinality.one}),
-                          RelationshipClass("R5", (), {Ik: Cardinality.one, Ij: Cardinality.one})]
-    Q = RelationalPath([B, R1, E1, R2, E3, R4, Ik, R5, Ij])
-    R = RelationalPath([Ij, R5, Ik, R4, E3, R2, E1, R3, E2, R4, Ik])
-    P = RelationalPath([B, R1, E1, R3, E2, R4, Ik])
-    P_prime = RelationalPath([B, R1, E1, R2, E3, R4, Ik])
-
-    assert P in set(extend(Q, R))
-    assert intersectible(P, P_prime)
-    assert P_prime == Q[:len(P_prime) - 1]
-    assert not co_intersectible(Q, R, P, P_prime)
-
-    # Twist with "many" cardinality
-    Ij, Ik, B, E1, E2, E3 = [EntityClass(e, ()) for e in ["Ij", "Ik", "B", "E1", "E2", "E3"]]
-    R1, R2, R3, R4, R5 = [RelationshipClass("R1", (), {B: Cardinality.one, E1: Cardinality.one}),
-                          RelationshipClass("R2", (), {E1: Cardinality.one, E3: Cardinality.one}),
-                          RelationshipClass("R3", (), {E1: Cardinality.one, E2: Cardinality.one}),
-                          RelationshipClass("R4", (), {E2: Cardinality.many, E3: Cardinality.many, Ik: Cardinality.one}),
-                          RelationshipClass("R5", (), {Ik: Cardinality.one, Ij: Cardinality.one})]
-    Q = RelationalPath([B, R1, E1, R2, E3, R4, Ik, R5, Ij])
-    R = RelationalPath([Ij, R5, Ik, R4, E3, R2, E1, R3, E2, R4, Ik])
-    P = RelationalPath([B, R1, E1, R3, E2, R4, Ik])
-    P_prime = RelationalPath([B, R1, E1, R2, E3, R4, Ik])
-
-    assert P in set(extend(Q, R))
-    assert intersectible(P, P_prime)
-    assert P_prime == Q[:len(P_prime) - 1]
-    assert co_intersectible(Q, R, P, P_prime)
 
 
 def test_UnvisitedQueue():
