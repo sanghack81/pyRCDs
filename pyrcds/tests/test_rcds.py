@@ -138,7 +138,8 @@ def test_company_agg_size():
     rcm = company_rcm()
     agg2h = AbstractGroundGraph(rcm, 2 * rcm.max_hop)
     assert agg2h.agg.number_of_nodes() == 158
-    assert agg2h.agg.number_of_edges() == 444
+    # assert agg2h.agg.number_of_edges() == 444
+    assert agg2h.agg.number_of_edges() == 487  # new agg
 
 
 def test_company_fig_4_4_maier():
@@ -156,14 +157,19 @@ def test_company_fig_4_4_maier():
     iv = frozenset((rvs[-1], rvs[0]))
     vs = set(rvs) | {iv}
     sub = agg2h.agg.subgraph(list(vs))
-    assert len(sub.edges()) == 7
+    # assert len(sub.edges()) == 7
+    assert len(sub.edges()) == 10  # new agg now has 10 not 7
     assert {(rvs[0], rvs[3]),
             (rvs[1], rvs[2]),
             (rvs[2], rvs[3]),
             (rvs[4], rvs[2]),
             (rvs[4], iv),
             (rvs[4], rvs[5]),
-            (iv, rvs[3])} == set(sub.edges())
+            (iv, rvs[3]),
+            # newly added three edges, due to path semantics
+            (rvs[1], rvs[0]),
+            (rvs[1], iv),
+            (rvs[1], rvs[5])} == set(sub.edges())
 
 
 def test_sound_rules():
