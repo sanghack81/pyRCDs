@@ -4,7 +4,7 @@ import numpy as np
 
 from pyrcds.domain import generate_schema, cardinality_sampler, RelationshipClass, Cardinality, EntityClass, RelationalSchema, AttributeClass
 from pyrcds.model import enumerate_rpaths, RelationalPath, RelationalVariable, RelationalDependency, RCM
-from pyrcds.rcds import new_extend, intersectible, co_intersectible, extend, AbstractGroundGraph
+from pyrcds.rcds import new_extend, extend, AbstractGroundGraph, intersectable, co_intersectable
 
 
 def test_extend_newextend_subsume_evidence():
@@ -16,8 +16,8 @@ def test_extend_newextend_subsume_evidence():
         if len(rpaths_of_base) > 50:
             rpaths_of_base = np.random.choice(rpaths_of_base, 50, replace=False)
         for Q, R in combinations(rpaths_of_base, 2):
-            s = set(extend(reversed(Q), R))
-            set1 = set(new_extend(reversed(Q), R))
+            s = set(extend(Q.reverse(), R))
+            set1 = set(new_extend(Q.reverse(), R))
             assert s <= set1
 
 
@@ -41,7 +41,7 @@ def test_co_intersectable_working():
         combis = list(combinations(P_candidates, 2))
         np.random.shuffle(combis)
         for P, P_prime in combis:
-            if intersectible(P, P_prime):
+            if intersectable(P, P_prime):
                 p_pairs.add((P, P_prime))
                 if len(p_pairs) > 5:
                     break
@@ -56,8 +56,8 @@ def test_co_intersectable_working():
                     for P_prime in P_candidates:
                         if P == P_prime:
                             continue
-                        if intersectible(P, P_prime):
-                            co_intersectible(Q, R, P, P_prime, schema)
+                        if intersectable(P, P_prime):
+                            co_intersectable(Q, R, P, P_prime, schema)
                             passed += 1
                         if passed > 5:
                             break
@@ -84,8 +84,8 @@ def test_agg_non_completeness():
     S = RelationalPath([E1, R1, E4, R3, E5])
     S_prime = RelationalPath([E1, R1, E2, R2, E3, R3, E5])
 
-    assert intersectible(S, S_prime)
-    assert co_intersectible(Q, D2, S, S_prime)
+    assert intersectable(S, S_prime)
+    assert co_intersectable(Q, D2, S, S_prime)
 
     P_X = RelationalVariable(P, X)
     S_Z = RelationalVariable(S, Z)

@@ -8,6 +8,7 @@ from typing import Set
 
 import networkx as nx
 from numpy.random.mtrand import random_sample, choice, randint
+
 from pyrcds.utils import between_sampler
 
 

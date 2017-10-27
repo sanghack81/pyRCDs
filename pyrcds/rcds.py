@@ -8,7 +8,7 @@ import networkx as nx
 
 from pyrcds.domain import RelationalSkeleton, RelationalSchema, SkItem, ItemClass
 from pyrcds.graphs import PDAG
-from pyrcds.model import RelationalDependency, PRCM, llrsp, RelationalVariable, eqint, RelationalPath, RCM, UndirectedRDep, SymTriple, enumerate_rvars, \
+from pyrcds.model import RelationalDependency, PRCM, llrsp, RelationalVariable, RelationalPath, RCM, UndirectedRDep, SymTriple, enumerate_rvars, \
     enumerate_rdeps
 from pyrcds.utils import group_by, unions, safe_iter
 
@@ -97,34 +97,50 @@ def extend(P: RelationalPath, Q: RelationalPath):
             yield P[:m - 1 - pivot] ** Q[pivot:]
 
 
-def intersectible(P: RelationalPath, Q: RelationalPath):
-    """See [1,2] for the description of intersectible
-
-    References
-    ----------
-    [1] Marc Maier (2014),
-        Causal Discovery for Relational Domains:
-        Representation, Reasoning, and Learning,
-        Ph.D. Dissertation, University of Massachusetts, Amherst
-    [2] Sanghack Lee and Vasant Honavar (2015),
-        Lifted Representation of Relational Causal Models Revisited:
-        Implications for Reasoning and Structure Learning,
-        In Proceedings of Workshop on Advances in Causal Inference co-located with UAI 2015
-    """
+def intersectable(P: RelationalPath, Q: RelationalPath):
     __validate_rpath(P)
     __validate_rpath(Q)
     if P == Q:
-        raise ValueError('{} == {}'.format(P, Q))
+        return True  # behavior changed
 
     return P.base == Q.base and P.terminal == Q.terminal and llrsp(P, Q) + llrsp(reversed(P), reversed(Q)) <= min(
         len(P), len(Q))
 
 
-def co_intersectible(Q: RelationalPath, R: RelationalPath, P: RelationalPath, P_prime: RelationalPath, schema: RelationalSchema = None):
+# def intersectible(P: RelationalPath, Q: RelationalPath):
+#     """See [1,2] for the description of intersectible
+#
+#     References
+#     ----------
+#     [1] Marc Maier (2014),
+#         Causal Discovery for Relational Domains:
+#         Representation, Reasoning, and Learning,
+#         Ph.D. Dissertation, University of Massachusetts, Amherst
+#     [2] Sanghack Lee and Vasant Honavar (2015),
+#         Lifted Representation of Relational Causal Models Revisited:
+#         Implications for Reasoning and Structure Learning,
+#         In Proceedings of Workshop on Advances in Causal Inference co-located with UAI 2015
+#     """
+#     raise Exception('use intersectable')
+#     # __validate_rpath(P)
+#     # __validate_rpath(Q)
+#     # if P == Q:
+#     #     raise ValueError('{} == {}'.format(P, Q))
+#     #
+#     # return P.base == Q.base and P.terminal == Q.terminal and llrsp(P, Q) + llrsp(reversed(P), reversed(Q)) <= min(
+#     #     len(P), len(Q))
+#
+#
+# def co_intersectible(Q: RelationalPath, R: RelationalPath, P: RelationalPath, P_prime: RelationalPath, schema: RelationalSchema = None):
+#     raise Exception('use co_intersectable')
+#     # return co_intersectible(Q, R, P, P_prime, schema)
+
+
+def co_intersectable(Q: RelationalPath, R: RelationalPath, P: RelationalPath, P_prime: RelationalPath, schema: RelationalSchema = None):
     assert Q.base == P.base == P_prime.base
     assert Q.terminal == R.base
     assert R.terminal == P.terminal == P_prime.terminal
-    assert intersectible(P, P_prime)
+    assert intersectable(P, P_prime)
 
     offset = 0
     p_items = list(range(len(P)))
@@ -302,7 +318,7 @@ class AbstractGroundGraph(CITester):
             self.extend[rv].add(rv)
         for _, rvs in group_by(self.RVs, lambda rv: (rv.rpath.base, rv.attr)):
             for rv1, rv2 in combinations(rvs, 2):
-                if intersectible(rv1.rpath, rv2.rpath):
+                if intersectable(rv1.rpath, rv2.rpath):
                     iv = c2[frozenset((rv1, rv2))]
                     self.IVs.add(iv)
                     self.combined[rv1.rpath].add(rv2.rpath)
@@ -327,7 +343,7 @@ class AbstractGroundGraph(CITester):
 
                         # Q, R, P, P_prime
                         for P_prime in self.combined[P]:
-                            if co_intersectible(Q, R, P, P_prime):
+                            if co_intersectable(Q, R, P, P_prime):
                                 iv = c2[frozenset((Px, c1[RelationalVariable(P_prime, X)]))]
                                 self.IVEs.add((iv, Qy))
 
@@ -335,7 +351,7 @@ class AbstractGroundGraph(CITester):
                                     self.logger.info('creating {} of IVEs.'.format(len(self.IVEs)))
                         # P, reversed(R), Q, Q_prime
                         for Q_prime in self.combined[Q]:
-                            if co_intersectible(P, reversed(R), Q, Q_prime):
+                            if co_intersectable(P, reversed(R), Q, Q_prime):
                                 iv = c2[frozenset((Qy, c1[RelationalVariable(Q_prime, Y)]))]
                                 self.IVEs.add((Px, iv))
 
@@ -819,7 +835,7 @@ def inner_canonical_unshielded_triples(M: PRCM, PyVx: RelationalDependency, QzVy
 
         l_alpha = LL(Q[b_x:b_r:-1], P[:a_r:-1])
         if l_alpha == 1:
-            if eqint(P[a_r:a_x], Q[b_x:b_r:-1]):
+            if intersectable(P[a_r:a_x], Q[b_x:b_r:-1]):
                 assert Vx != RrZ
                 cut = (Vx, frozenset({Py, RelationalVariable(P[:a_r] ** Q[:b_r:-1], Y)}), RrZ)
                 if with_anchors:
@@ -846,9 +862,9 @@ def inner_canonical_unshielded_triples(M: PRCM, PyVx: RelationalDependency, QzVy
                     continue
 
                 l_beta = LL(PB, QB)
-                if (not eqint(PB, QA)) or (l_beta > 1 and l_beta == min(len(PB), len(QB))):
+                if (not intersectable(PB, QA)) or (l_beta > 1 and l_beta == min(len(PB), len(QB))):
                     continue
-                assert eqint(PB, QA) or 1 < l_beta < min(len(PB), len(QB))
+                assert intersectable(PB, QA) or 1 < l_beta < min(len(PB), len(QB))
 
                 a_z, b_z = a_s + l_beta - 1, b_s - l_beta + 1
                 # the third characteristic anchor
@@ -868,8 +884,8 @@ def inner_canonical_unshielded_triples(M: PRCM, PyVx: RelationalDependency, QzVy
 
                     l_gamma = LL(PC, QD)
                     assert 1 <= l_gamma
-                    if l_gamma == 1 and eqint(PD, QD) or 1 < l_gamma < min(len(PC),
-                                                                           len(QD)) and a_t < a_x and b_x < b_t:
+                    if l_gamma == 1 and intersectable(PD, QD) or 1 < l_gamma < min(len(PC),
+                                                                                   len(QD)) and a_t < a_x and b_x < b_t:
                         a_w, b_w = a_t - l_gamma + 1, b_t - l_gamma + 1
 
                         PP = {P,
@@ -986,7 +1002,7 @@ def new_extend_iter2(P: RelationalPath, Q: RelationalPath):
 
         l_alpha = LL(Q[b_x:b_r:-1], P[:a_r:-1])
         if l_alpha == 1:
-            if eqint(P[a_r:a_x], Q[b_x:b_r:-1]):
+            if intersectable(P[a_r:a_x], Q[b_x:b_r:-1]):
                 yield Rr
 
         elif l_alpha < b_r - b_x + 1 and a_r < a_x and b_x < b_r:
@@ -1018,7 +1034,7 @@ def new_extend_iter(P: RelationalPath, Q: RelationalPath, with_anchors=False):
 
         l_alpha = LL(Q[b_x:b_r:-1], P[:a_r:-1])
         if l_alpha == 1:
-            if eqint(P[a_r:a_x], Q[b_x:b_r:-1]):
+            if intersectable(P[a_r:a_x], Q[b_x:b_r:-1]):
                 yield Rr if not with_anchors else (Rr, frozenset(restore_anchors(P, Q, a_r, b_r, a_r, b_r)))
 
         elif l_alpha < b_r - b_x + 1 and a_r < a_x and b_x < b_r:
@@ -1038,9 +1054,9 @@ def new_extend_iter(P: RelationalPath, Q: RelationalPath, with_anchors=False):
                     continue
 
                 l_beta = LL(PB, QB)
-                if (not eqint(PB, QA)) or (l_beta > 1 and l_beta == min(len(PB), len(QB))):
+                if (not intersectable(PB, QA)) or (l_beta > 1 and l_beta == min(len(PB), len(QB))):
                     continue
-                assert eqint(PB, QA) or 1 < l_beta < min(len(PB), len(QB))
+                assert intersectable(PB, QA) or 1 < l_beta < min(len(PB), len(QB))
 
                 a_z, b_z = a_s + l_beta - 1, b_s - l_beta + 1
                 # the third characteristic anchor

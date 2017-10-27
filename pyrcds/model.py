@@ -132,6 +132,9 @@ class RelationalPath:
     def __reversed__(self):
         return RelationalPath(tuple(reversed(self.__item_classes)), True)
 
+    def reverse(self) -> 'RelationalPath':
+        return RelationalPath(tuple(reversed(self.__item_classes)), True)
+
     @property
     def hop_len(self):
         return len(self) - 1
@@ -200,13 +203,6 @@ def llrsp(p1: RelationalPath, p2: RelationalPath) -> int:
         prev = x
 
     return min(len(p1), len(p2))
-
-
-def eqint(p1: RelationalPath, p2: RelationalPath):
-    """Equal or intersectible"""
-    if (p1.base, p1.terminal) != (p2.base, p2.terminal):
-        return False
-    return p1 == p2 or llrsp(p1, p2) + llrsp(reversed(p1), reversed(p2)) <= min(len(p1), len(p2))
 
 
 # Immutable
@@ -302,19 +298,24 @@ class RelationalDependency:
 
     # reversed(P.X --> Vy) = ~P.Y --> Vx
     def __reversed__(self):
-        new_cause = RelationalVariable(reversed(self.cause.rpath), self.effect.attr)
+        new_cause = RelationalVariable(self.cause.rpath.reverse(), self.effect.attr)
         new_effect = RelationalVariable(RelationalPath(self.cause.terminal), self.cause.attr)
         return RelationalDependency(new_cause, new_effect)
 
     def opposite(self) -> 'RelationalDependency':
-        new_cause = RelationalVariable(reversed(self.cause.rpath), self.effect.attr)
+        new_cause = RelationalVariable(self.cause.rpath.reverse(), self.effect.attr)
+        new_effect = RelationalVariable(RelationalPath(self.cause.terminal), self.cause.attr)
+        return RelationalDependency(new_cause, new_effect)
+
+    def reverse(self) -> 'RelationalDependency':  # alias
+        new_cause = RelationalVariable(self.cause.rpath.reverse(), self.effect.attr)
         new_effect = RelationalVariable(RelationalPath(self.cause.terminal), self.cause.attr)
         return RelationalDependency(new_cause, new_effect)
 
     # dual(P.X --> Vy) = (Vx, ~P.Y)
     @property
     def dual(self):
-        new_cause = RelationalVariable(reversed(self.cause.rpath), self.effect.attr)
+        new_cause = RelationalVariable(self.cause.rpath.reverse(), self.effect.attr)
         new_effect = RelationalVariable(RelationalPath(self.cause.terminal), self.cause.attr)
         return new_effect, new_cause
 
@@ -366,8 +367,7 @@ class UndirectedRDep:
 
     def __init__(self, rdep: RelationalDependency):
         assert isinstance(rdep, RelationalDependency)
-        self.rdeps = frozenset({rdep, rdep.opposite()})
-        # self.rdeps = frozenset({rdep, reversed(rdep)})
+        self.rdeps = frozenset({rdep, rdep.reverse()})
 
     def __lt__(self, other):
         return sorted(self.rdeps) < sorted(other.rdeps)
@@ -421,7 +421,7 @@ class PRCM:
 
     @property
     def full_dependencies(self):
-        return {d_ for d in self.directed_dependencies for d_ in (d, (reversed(d)))} | \
+        return {d_ for d in self.directed_dependencies for d_ in (d, (d.reverse()))} | \
                {d for u in self.undirected_dependencies for d in u}
 
     @property
@@ -484,7 +484,7 @@ class PRCM:
                 return
             if UndirectedRDep(d) in self.undirected_dependencies:
                 raise ValueError('undirected dependency exists for {}'.format(d))
-            if reversed(d) in self.directed_dependencies:
+            if d.reverse() in self.directed_dependencies:
                 raise ValueError('opposite-directed dependency exists for {}'.format(d))
             self.parents[effect].add(cause)
             dual_cause, dual_effect = d.dual
@@ -508,7 +508,7 @@ class PRCM:
     def remove(self, d):
         if isinstance(d, RelationalDependency) and d not in self.directed_dependencies:
             if d.cause in self.ne(d.effect):
-                self.orient_as(reversed(d))
+                self.orient_as(d.reverse())
                 return
         elif isinstance(d, RelationalDependency) and d in self.directed_dependencies:
             self.parents[d.effect].remove(d.cause)
@@ -793,7 +793,7 @@ def generate_rpath(schema: RelationalSchema, base: ItemClass = None, length=None
     -----
     The length is the upper bound of the generated relational path.
     """
-    assert length is None or 1 <= length
+    assert length is not None and 1 <= length
     if base is None:
         base = choice(sorted(schema.entities | schema.relationships))
     assert base in schema

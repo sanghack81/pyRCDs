@@ -107,7 +107,7 @@ def max_agg(default=0.0):
     return lambda items: max(items) if len(items) > 0 else default
 
 
-def linear_gaussian(parameters: dict, aggregator, error):
+def linear_gaussian(parameters: dict, aggregator, error) -> typing.Callable:
     """A linear model with an additive Gaussian noise.
 
     Parameters

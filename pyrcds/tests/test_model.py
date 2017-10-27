@@ -5,8 +5,9 @@ from networkx import is_directed_acyclic_graph
 from tqdm import trange
 
 from pyrcds.domain import AttributeClass, RelationalSkeleton, SkItem, generate_schema, generate_skeleton
-from pyrcds.model import RelationalPath, llrsp, eqint, RelationalVariable, terminal_set, PRCM, UndirectedRDep, RCM, GroundGraph, generate_rcm, \
+from pyrcds.model import RelationalPath, llrsp, RelationalVariable, terminal_set, PRCM, UndirectedRDep, RCM, GroundGraph, generate_rcm, \
     canonical_rvars, linear_gaussians_rcm, generate_values_for_skeleton, flatten, generate_rpath, is_valid_rpath
+from pyrcds.rcds import intersectable
 from pyrcds.tests.testing_utils import EPBDF, company_schema, company_rcm, company_skeleton, company_deps
 from pyrcds.utils import between_sampler
 
@@ -93,9 +94,9 @@ def test_rpath_4():
     assert llrsp(RelationalPath([P, F, B]), RelationalPath([P, F, B])) == 3
     assert llrsp(RelationalPath([E, D, P, F, B]), RelationalPath([E, D, P, D, E])) == 1
     assert llrsp(RelationalPath([P, F, B, F, P]), RelationalPath([P, F, B, F, P])) == 3
-    assert eqint(RelationalPath([P, F, B, F, P]), RelationalPath([P, F, B, F, P]))
-    assert eqint(RelationalPath([E, D, P, D, E]), RelationalPath([E, D, P, D, E, D, P, D, E]))
-    assert eqint(RelationalPath([E, D, P, D, E]), RelationalPath([E, D, P, D, E, D, P, D, E]))
+    assert intersectable(RelationalPath([P, F, B, F, P]), RelationalPath([P, F, B, F, P]))
+    assert intersectable(RelationalPath([E, D, P, D, E]), RelationalPath([E, D, P, D, E, D, P, D, E]))
+    assert intersectable(RelationalPath([E, D, P, D, E]), RelationalPath([E, D, P, D, E, D, P, D, E]))
     assert RelationalVariable(RelationalPath([E, D, P, D, E]), AttributeClass('Salary')) == RelationalVariable(RelationalPath([E, D, P, D, E]), AttributeClass('Salary'))
     assert not RelationalVariable(RelationalPath([E, D, P, D, E]), AttributeClass('Salary')).is_canonical
     assert RelationalVariable(RelationalPath(E), AttributeClass('Salary')).is_canonical

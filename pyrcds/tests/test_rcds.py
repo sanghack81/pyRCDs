@@ -6,9 +6,9 @@ from pyrcds.domain import generate_schema, RelationalSchema, Cardinality, Relati
 from pyrcds.graphs import PDAG
 from pyrcds.model import generate_rcm, RelationalPath, RelationalVariable, SymTriple, UndirectedRDep, is_valid_rpath, enumerate_rpaths, \
     enumerate_rdeps, enumerate_rvars
-from pyrcds.rcds import interner, extend, intersectible, UnvisitedQueue, AbstractGroundGraph, sound_rules, completes, \
+from pyrcds.rcds import interner, extend, UnvisitedQueue, AbstractGroundGraph, sound_rules, completes, \
     d_separated, \
-    RpCD, markov_equivalence, CITester, CITestResult, co_intersectible, new_extend
+    RpCD, markov_equivalence, CITester, CITestResult, new_extend, intersectable, co_intersectable, CIQuery
 from pyrcds.tests.testing_utils import company_rcm, company_schema, EPBDF
 
 
@@ -87,10 +87,10 @@ def test_extend():
 def test_intersectible():
     E, P, B, D, F = EPBDF()
 
-    assert intersectible(RelationalPath([E, D, P, F, B, F, P, D, E]), RelationalPath([E, D, P, D, E]))
-    assert not intersectible(RelationalPath([E, D, P, F, B, F, P]), RelationalPath([E, D, P, D, E]))
-    assert not intersectible(RelationalPath([D, P, F, B, F, P]), RelationalPath([E, D, P, D, E]))
-    assert not intersectible(RelationalPath([E]), RelationalPath([E, D, P, D, E]))
+    assert intersectable(RelationalPath([E, D, P, F, B, F, P, D, E]), RelationalPath([E, D, P, D, E]))
+    assert not intersectable(RelationalPath([E, D, P, F, B, F, P]), RelationalPath([E, D, P, D, E]))
+    assert not intersectable(RelationalPath([D, P, F, B, F, P]), RelationalPath([E, D, P, D, E]))
+    assert not intersectable(RelationalPath([E]), RelationalPath([E, D, P, D, E]))
 
 
 def test_UnvisitedQueue():
@@ -260,8 +260,9 @@ def test_company_fixer():
         def ci_test_data(self, x, y, zs, attrs, base_items, query_name='') -> CITestResult:
             raise NotImplementedError()
 
-        def ci_test(self, x, y, zs, **options):
-            return np.random.randint(10) == 0
+        def ci_test(self, x: RelationalVariable, y: RelationalVariable, zs=tuple(), **options) -> CITestResult:
+            query = CIQuery(x, y, zs)
+            return CITestResult(query, np.random.randint(10) == 0)
 
         @property
         def is_p_value_available(self):
@@ -328,5 +329,5 @@ def test_co_intersectable_example():
     schema = RelationalSchema(entities, [R1, R2, R3, R4, R5])
     assert P in set(extend(Q, R))
     assert P in set(new_extend(Q, R))
-    assert intersectible(P, P_prime)
-    assert not co_intersectible(Q, R, P, P_prime, schema)
+    assert intersectable(P, P_prime)
+    assert not co_intersectable(Q, R, P, P_prime, schema)
