@@ -32,7 +32,7 @@ def unions(sets):
         return set(chain(*sets))
 
 
-def group_by(xs: typing.Iterable[T], keyfunc, sort=False) -> typing.Iterator[typing.Tuple[T, typing.List]]:
+def group_by(xs: typing.Iterable[T], keyfunc, sort=False) -> typing.Iterator[typing.Tuple[typing.Any, typing.List[T]]]:
     """A generator of tuples of a key and its group as a `list`"""
     if not sort:
         return ((k, list(g)) for k, g in groupby(sorted(xs, key=keyfunc), key=keyfunc))

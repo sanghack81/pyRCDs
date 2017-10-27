@@ -1,6 +1,6 @@
 from pyrcds.utils import between_sampler, average_agg, max_agg, normal_sampler, linear_gaussian, group_by, \
     unions, LRUCache, safe_iter
-
+import typing
 
 def test_group_by():
     grouped = list(group_by(((1, 2), (2, 3), (3, 2), (4, 4)), lambda x: x[1]))
@@ -54,7 +54,7 @@ def test_aggregators():
 
 
 def test_linear_gaussian():
-    lgm = linear_gaussian({'x': 2.0, 'y': 1.0}, average_agg(), normal_sampler(0.0, 0.0))
+    lgm = linear_gaussian({'x': 2.0, 'y': 1.0}, average_agg(), normal_sampler(0.0, 0.0))    # type: typing.Callable
     values = {'a': 1.0, 'b': 2.0, 'c': 3.0}
     cause_attrs = {'x': ['a', 'b', 'c'], 'y': ['c']}
 
@@ -63,7 +63,7 @@ def test_linear_gaussian():
 
 
 def test_linear_max_gaussian():
-    lgm = linear_gaussian({'x': 2.0, 'y': 1.0}, max_agg(), normal_sampler(1.0, 0.0))
+    lgm = linear_gaussian({'x': 2.0, 'y': 1.0}, max_agg(), normal_sampler(1.0, 0.0))    # type: typing.Callable
     values = {'a': 1.0, 'b': 2.0, 'c': 3.0}
     cause_attrs = {'x': ['a', 'b', 'c'], 'y': ['c']}
 

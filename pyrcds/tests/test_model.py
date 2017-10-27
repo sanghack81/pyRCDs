@@ -1,3 +1,5 @@
+from typing import Union, List
+
 import numpy as np
 import pytest
 from joblib import Parallel, delayed
@@ -78,7 +80,7 @@ def test_rpath_4():
     assert E == RelationalPath([D, P, D, E]).terminal
     assert D == RelationalPath([D, P, D, E]).base
     assert P == RelationalPath([D, P, D, E])[1]
-    assert reversed(RelationalPath([D, P, D, E])) == RelationalPath(tuple(reversed([D, P, D, E]))) == RelationalPath([E, D, P, D])
+    assert RelationalPath([D, P, D, E]).reverse() == RelationalPath(tuple(reversed([D, P, D, E]))) == RelationalPath([E, D, P, D])
     RelationalPath([D, P, F, B])
     RelationalPath([D, P, F, B, F])
     RelationalPath([D, P, F, B, F, P])
@@ -206,7 +208,7 @@ def test_crv():
 
 def test_rcm_orient_0():
     deps = company_deps()
-    urcm = PRCM(company_schema, {UndirectedRDep(d) for d in deps})
+    urcm = PRCM(company_schema(), {UndirectedRDep(d) for d in deps})
     for d in deps:
         urcm.orient_as(d)
     with pytest.raises(Exception):
@@ -216,7 +218,7 @@ def test_rcm_orient_0():
 
 def test_rcm_orient_1():
     deps = company_deps()
-    urcm = PRCM(company_schema, {UndirectedRDep(d) for d in deps})
+    urcm = PRCM(company_schema(), {UndirectedRDep(d) for d in deps})
     with pytest.raises(Exception):
         urcm.add(deps)
 
@@ -261,7 +263,7 @@ def test_generate_rpaths():
             assert is_valid_rpath([i for i in rpath])
 
 
-def random_seeds(n=None):
+def random_seeds(n=None) -> Union[int, List[int]]:
     """Random seeds of given size or a random seed if n is None"""
     if n is None:
         return np.random.randint(np.iinfo(np.int32).max)
@@ -290,8 +292,8 @@ def _test_gen_inner(seed):
     data_frame2 = flatten(skeleton, causes_of_the_base, False, True)
     data_frame3 = flatten(skeleton, causes_of_the_base, True, False)
     # base items
-    assert np.all((data_frame3[:, 0] == data_frame1[:, 0]).flatten())
-    assert np.all((data_frame1[:, 1] == data_frame2[:, 0]).flatten())
-    assert np.all((data_frame0[:, 0] == data_frame3[:, 1]).flatten())
+    assert np.all((np.equal(data_frame3[:, 0], data_frame1[:, 0])).ravel())
+    assert np.all((np.equal(data_frame1[:, 1], data_frame2[:, 0])).ravel())
+    assert np.all((np.equal(data_frame0[:, 0], data_frame3[:, 1])).ravel())
     assert sorted(sorted(val for item, val in ivs) for ivs in data_frame0[:, 0]) == sorted(
         sorted(v) for v in data_frame1[:, 1])

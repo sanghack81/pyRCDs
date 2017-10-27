@@ -103,7 +103,7 @@ def intersectable(P: RelationalPath, Q: RelationalPath):
     if P == Q:
         return True  # behavior changed
 
-    return P.base == Q.base and P.terminal == Q.terminal and llrsp(P, Q) + llrsp(reversed(P), reversed(Q)) <= min(
+    return P.base == Q.base and P.terminal == Q.terminal and llrsp(P, Q) + llrsp(P.reverse(), Q.reverse()) <= min(
         len(P), len(Q))
 
 
@@ -172,10 +172,10 @@ def co_intersectable(Q: RelationalPath, R: RelationalPath, P: RelationalPath, P_
         if not all(merge(items_of[A][i], items_of[B][i]) for i in range(llrsp(rpaths[A], rpaths[B]))):
             return False
     for A, B in combinations(('P', 'P_prime', 'R'), 2):
-        if not all(merge(items_of[A][-1 - i], items_of[B][-1 - i]) for i in range(llrsp(reversed(rpaths[A]), reversed(rpaths[B])))):
+        if not all(merge(items_of[A][-1 - i], items_of[B][-1 - i]) for i in range(llrsp(rpaths[A].reverse(), rpaths[B].reverse()))):
             return False
 
-    if not all(merge(q_items[-1 - i], r_items[i]) for i in range(llrsp(reversed(Q), R))):
+    if not all(merge(q_items[-1 - i], r_items[i]) for i in range(llrsp(Q.reverse(), R))):
         return False
 
     item_class_of = dict()
@@ -185,6 +185,7 @@ def co_intersectable(Q: RelationalPath, R: RelationalPath, P: RelationalPath, P_
         item_class_of.update({item: rpath[at] for at, item in enumerate(items)})
 
     to_merges = True
+    adjacencies = None
     while to_merges:
         # refresh adjacent information
         adjacencies = defaultdict(set)
@@ -351,7 +352,7 @@ class AbstractGroundGraph(CITester):
                                     self.logger.info('creating {} of IVEs.'.format(len(self.IVEs)))
                         # P, reversed(R), Q, Q_prime
                         for Q_prime in self.combined[Q]:
-                            if co_intersectable(P, reversed(R), Q, Q_prime):
+                            if co_intersectable(P, R.reverse(), Q, Q_prime):
                                 iv = c2[frozenset((Qy, c1[RelationalVariable(Q_prime, Y)]))]
                                 self.IVEs.add((Px, iv))
 
@@ -813,7 +814,7 @@ def inner_canonical_unshielded_triples(M: PRCM, PyVx: RelationalDependency, QzVy
         raise ValueError("{} and {} do not share the common attribute class.".format(PyVx, QzVy))
 
     m, n = len(P), len(Q)
-    l = LL(reversed(P), Q)
+    l = LL(P.reverse(), Q)
     a_x, b_x = m - l, l - 1
 
     # A set of candidate anchors
@@ -982,7 +983,7 @@ def new_extend_iter2(P: RelationalPath, Q: RelationalPath):
     LL = llrsp
 
     m, n = len(P), len(Q)
-    l = LL(reversed(P), Q)
+    l = LL(P.reverse(), Q)
     a_x, b_x = m - l, l - 1
 
     # A set of candidate anchors
@@ -1014,7 +1015,7 @@ def new_extend_iter(P: RelationalPath, Q: RelationalPath, with_anchors=False):
     LL = llrsp
 
     m, n = len(P), len(Q)
-    l = LL(reversed(P), Q)
+    l = LL(P.reverse(), Q)
     a_x, b_x = m - l, l - 1
 
     # A set of candidate anchors

@@ -5,7 +5,7 @@ from os.path import expanduser
 
 from pyrcds.domain import RelationshipClass, EntityClass, AttributeClass, Cardinality, RelationalSchema, RelationalSkeleton, SkItem, generate_skeleton, \
     ImmutableRSkeleton, remove_lone_entities
-from pyrcds.model import RelationalDependency, PRCM, RelationalPath, ParamRCM, generate_values_for_skeleton, normalize_skeleton
+from pyrcds.model import RelationalDependency, RelationalPath, ParamRCM, generate_values_for_skeleton, normalize_skeleton, RCM
 from pyrcds.model import RelationalVariable
 from pyrcds.utils import linear_gaussian, average_agg, normal_sampler, xors
 
@@ -33,7 +33,7 @@ def company_deps():
 
 
 @functools.lru_cache(1)
-def company_schema():
+def company_schema() -> RelationalSchema:
     """A sample relational schema. See [1]
 
     References
@@ -84,7 +84,7 @@ def company_skeleton():
 
 
 @functools.lru_cache(1)
-def company_rcm() -> PRCM:
+def company_rcm() -> RCM:
     """A sample relational causal model. See [1]
 
     References
@@ -95,7 +95,7 @@ def company_rcm() -> PRCM:
         Ph.D. Dissertation, University of Massachusetts, Amherst
 
     """
-    return PRCM(company_schema(), company_deps())
+    return RCM(company_schema(), company_deps())
 
 
 def gen_company_data(n, max_degree=2, stdev=0.3, xor=False, flip=0.15, remove_lone=False, schema=company_schema(),
