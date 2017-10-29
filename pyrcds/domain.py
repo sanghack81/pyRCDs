@@ -407,7 +407,7 @@ class ClassImmutableRSkeleton(RelationalSkeleton):
     def __init__(self, skeleton: RelationalSkeleton):
         # TODO does not inherit correctly
         self.schema = skeleton.schema
-        self._nodes = frozenset(skeleton._G.nodes_iter())
+        self._nodes = frozenset(skeleton._G.nodes)
         self._nodes_of = defaultdict(frozenset)
         self._nodes_of.update({k: frozenset(vs) for k, vs in skeleton._nodes_by_type.items()})
         self._ne = defaultdict(frozenset)
@@ -577,7 +577,7 @@ def generate_skeleton(schema: RelationalSchema, min_items_per_class=300, max_deg
             skeleton.add_entity(e)
     for R in sorted(schema.relationships):
         for r in nodes[R]:
-            skeleton.add_relationship(r, g.neighbors(r))
+            skeleton.add_relationship(r, set(g.neighbors(r)))
     return skeleton
 
 

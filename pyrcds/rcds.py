@@ -267,14 +267,14 @@ def d_separated(dag: nx.DiGraph, x, y, zs=frozenset()):
         node, direction = qq.pop()
         if direction == '>':
             if node not in zs:
-                qq.puts((ch, '>') for ch in dag.successors_iter(node))
+                qq.puts((ch, '>') for ch in dag.successors(node))
             else:
-                qq.puts((pa, '<') for pa in dag.predecessors_iter(node))
+                qq.puts((pa, '<') for pa in dag.predecessors(node))
 
         else:  # '<'
             if node not in zs:
-                qq.puts((ch, '>') for ch in dag.successors_iter(node))
-                qq.puts((pa, '<') for pa in dag.predecessors_iter(node))
+                qq.puts((ch, '>') for ch in dag.successors(node))
+                qq.puts((pa, '<') for pa in dag.predecessors(node))
 
         if {(y, '>'), (y, '<')} & qq.visited:
             return False
@@ -727,7 +727,7 @@ def anchors_to_skeleton(schema: RelationalSchema, P: RelationalPath, Q: Relation
 
     all_auxs = set()
     cc = count()
-    for v in list(temp_g.nodes()):
+    for v in list(temp_g.nodes):
         if v.item_class.is_relationship_class:
             missing = set(v.item_class.entities) - {ne.item_class for ne in temp_g.neighbors(v)}
             auxs = {SkItem('aux' + str(next(cc)), ic) for ic in missing}
@@ -737,8 +737,8 @@ def anchors_to_skeleton(schema: RelationalSchema, P: RelationalPath, Q: Relation
                 temp_g.add_edge(v, aux)
 
     skeleton = RelationalSkeleton(schema, True)
-    entities = list(filter(lambda vv: vv.item_class.is_entity_class, temp_g.nodes()))
-    relationships = list(filter(lambda vv: vv.item_class.is_relationship_class, temp_g.nodes()))
+    entities = list(filter(lambda vv: vv.item_class.is_entity_class, temp_g.nodes))
+    relationships = list(filter(lambda vv: vv.item_class.is_relationship_class, temp_g.nodes))
     skeleton.add_entities(*entities)
     for r in relationships:
         skeleton.add_relationship(r, set(temp_g.neighbors(r)))

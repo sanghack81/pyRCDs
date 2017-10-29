@@ -876,7 +876,7 @@ def generate_values_for_skeleton(rcm: ParamRCM, skeleton: RelationalSkeleton):
     """
     cdg = rcm.class_dependency_graph
     nx_cdg = cdg.as_networkx_dag()
-    ordered_attributes = nx.topological_sort(nx_cdg)
+    ordered_attributes = list(nx.topological_sort(nx_cdg))
     ordered_attributes += list(set(rcm.schema.attrs) - set(ordered_attributes))
 
     for attr in ordered_attributes:
@@ -959,8 +959,7 @@ def enumerate_rvars(schema: RelationalSchema, hop):
 
     for base_item_class in schema.item_classes:
         for P in enumerate_rpaths(schema, hop, base_item_class):
-            for attr in P.terminal.attrs:
-                yield RelationalVariable(P, attr)
+            yield from (RelationalVariable(P, attr) for attr in P.terminal.attrs)
 
 
 class interner(dict):
