@@ -21,9 +21,30 @@ def EPBDF():
     return E, P, B, D, F
 
 
+def EPBDF_many():
+    E = EntityClass('Employee', ('Salary', 'Competence'))
+    P = EntityClass('Product', (AttributeClass('Success'),))
+    B = EntityClass('BizUnit', (AttributeClass('Revenue'), AttributeClass('Budget')))
+    D = RelationshipClass('Develops', tuple(), {E: Cardinality.many, P: Cardinality.many})
+    F = RelationshipClass('Funds', tuple(), {P: Cardinality.many, B: Cardinality.many})
+
+    return E, P, B, D, F
+
+
 @functools.lru_cache(1)
 def company_deps():
     E, P, B, D, F = EPBDF()
+    deps = (RelationalDependency(RelationalVariable(E, 'Competence'), RelationalVariable(E, 'Salary')),
+            RelationalDependency(RelationalVariable([E, D, P, F, B], 'Budget'), RelationalVariable(E, 'Salary')),
+            RelationalDependency(RelationalVariable([P, D, E], 'Competence'), RelationalVariable(P, 'Success')),
+            RelationalDependency(RelationalVariable([B, F, P], 'Success'), RelationalVariable(B, 'Revenue')),
+            RelationalDependency(RelationalVariable(B, 'Revenue'), RelationalVariable(B, 'Budget')))
+    return deps
+
+
+@functools.lru_cache(1)
+def company_deps_many():
+    E, P, B, D, F = EPBDF_many()
     deps = (RelationalDependency(RelationalVariable(E, 'Competence'), RelationalVariable(E, 'Salary')),
             RelationalDependency(RelationalVariable([E, D, P, F, B], 'Budget'), RelationalVariable(E, 'Salary')),
             RelationalDependency(RelationalVariable([P, D, E], 'Competence'), RelationalVariable(P, 'Success')),
@@ -46,6 +67,12 @@ def company_schema() -> RelationalSchema:
     """
 
     E, P, B, D, F = EPBDF()
+    return RelationalSchema({E, P, B}, {D, F})
+
+
+@functools.lru_cache(1)
+def company_schema_many() -> RelationalSchema:
+    E, P, B, D, F = EPBDF_many()
     return RelationalSchema({E, P, B}, {D, F})
 
 
@@ -96,6 +123,11 @@ def company_rcm() -> RCM:
 
     """
     return RCM(company_schema(), company_deps())
+
+
+@functools.lru_cache(1)
+def company_rcm_many() -> RCM:
+    return RCM(company_schema_many(), company_deps_many())
 
 
 def gen_company_data(n, max_degree=2, stdev=0.3, xor=False, flip=0.15, remove_lone=False, schema=company_schema(),

@@ -2,6 +2,7 @@ import functools
 import typing
 from collections import defaultdict, namedtuple, deque
 from itertools import cycle, product, combinations
+from typing import Set
 
 import networkx as nx
 import numpy as np
@@ -405,8 +406,8 @@ class PRCM:
             dependencies = frozenset()
         self.schema = schema
 
-        self.directed_dependencies = set()
-        self.undirected_dependencies = set()
+        self.directed_dependencies = set()  # type: Set[RelationalDependency]
+        self.undirected_dependencies = set()  # type: Set[UndirectedRDep]
 
         self.parents = defaultdict(set)
         self.children = defaultdict(set)
@@ -425,7 +426,7 @@ class PRCM:
                {d for u in self.undirected_dependencies for d in u}
 
     @property
-    def degree(self):
+    def degree(self) -> int:
         """The maximum number of causes (or causes to be) of a canonical relational variable in the PRCM.
 
         Notes
@@ -434,16 +435,16 @@ class PRCM:
         """
         return max(len(self.adj(v)) for v in (self.parents.keys() | self.neighbors.keys()))
 
-    def pa(self, rvar: RelationalVariable):
+    def pa(self, rvar: RelationalVariable) -> Set[RelationalVariable]:
         return self.parents[rvar]
 
-    def ch(self, rvar: RelationalVariable):
+    def ch(self, rvar: RelationalVariable) -> Set[RelationalVariable]:
         return self.children[rvar]
 
-    def ne(self, rvar: RelationalVariable):
+    def ne(self, rvar: RelationalVariable) -> Set[RelationalVariable]:
         return self.neighbors[rvar]
 
-    def adj(self, rvar: RelationalVariable):
+    def adj(self, rvar: RelationalVariable) -> Set[RelationalVariable]:
         return self.neighbors[rvar] | self.parents[rvar] | self.children[rvar]
 
     @property
@@ -526,7 +527,7 @@ class PRCM:
             for x in d:  # delegate as far as it is iterable
                 self.remove(x)
 
-    def orient_as(self, edge):
+    def orient_as(self, edge) -> bool:
         if edge in self.directed_dependencies:
             return False
         assert isinstance(edge, RelationalDependency)

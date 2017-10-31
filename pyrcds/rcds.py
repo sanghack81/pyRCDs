@@ -282,6 +282,74 @@ def d_separated(dag: nx.DiGraph, x, y, zs=frozenset()):
     return True
 
 
+def d_separated_tracking(dag: nx.DiGraph, x, y, zs=frozenset()):
+    """A simple implementation of d-separation. """
+    assert x != y
+    assert x not in zs and y not in zs
+
+    qq = deque(((x, '>'), (x, '<')))
+    visited =set()
+    previous = dict()
+    while qq:
+        node, direction = prev = qq.pop()
+        if direction == '>':
+            if node not in zs:
+                for ch in dag.successors(node):
+                    if (ch, '>') not in visited:
+                        qq.append((ch, '>'))
+                        visited.add((ch, '>'))
+                        previous[(ch, '>')] = prev
+            else:
+                for pa in dag.predecessors(node):
+                    if (pa, '<') not in visited:
+                        qq.append((pa, '<'))
+                        visited.add((pa, '<'))
+                        previous[(pa, '<')] = prev
+
+        else:  # '<'
+            if node not in zs:
+                for ch in dag.successors(node):
+                    if (ch, '>') not in visited:
+                        qq.append((ch, '>'))
+                        visited.add((ch, '>'))
+                        previous[(ch, '>')] = prev
+                for pa in dag.predecessors(node):
+                    if (pa, '<') not in visited:
+                        qq.append((pa, '<'))
+                        visited.add((pa, '<'))
+                        previous[(pa, '<')] = prev
+
+        if {(y, '>'), (y, '<')} & visited:
+            if (y, '>') in visited:
+                last = (y, '>')
+            else:
+                last = (y, '<')
+            history = deque()
+            while last:
+                if last in history: # but why?
+                    break
+                history.appendleft(last)
+                if last in previous:
+                    last = previous[last]
+                else:
+                    last = False
+            outstr = ''
+            for at, direction in list(history):
+                if outstr:
+                    outstr += ' '+str(direction)+' '+str(at)
+                else:
+                    outstr = str(at)
+            print(outstr)
+
+
+
+
+
+            return False
+
+    return True
+
+
 class AbstractGroundGraph(CITester):
     """Revised Abstract Ground Graph(s) taking intersectibility and co-intersectibility described in [1].
 
@@ -389,6 +457,8 @@ class AbstractGroundGraph(CITester):
         for x_ in x_bar:
             for y_ in y_bar:
                 if not d_separated(self.agg, x_, y_, zs_bar):
+                    if 'track' in options:
+                        d_separated_tracking(self.agg, x_, y_, zs_bar)
                     return CITestResult(query, False)
         return CITestResult(query, True)
 
