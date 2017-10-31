@@ -288,7 +288,7 @@ def d_separated_tracking(dag: nx.DiGraph, x, y, zs=frozenset()):
     assert x not in zs and y not in zs
 
     qq = deque(((x, '>'), (x, '<')))
-    visited =set()
+    visited = set()
     previous = dict()
     while qq:
         node, direction = prev = qq.pop()
@@ -326,7 +326,7 @@ def d_separated_tracking(dag: nx.DiGraph, x, y, zs=frozenset()):
                 last = (y, '<')
             history = deque()
             while last:
-                if last in history: # but why?
+                if last in history:  # but why?
                     break
                 history.appendleft(last)
                 if last in previous:
@@ -336,14 +336,10 @@ def d_separated_tracking(dag: nx.DiGraph, x, y, zs=frozenset()):
             outstr = ''
             for at, direction in list(history):
                 if outstr:
-                    outstr += ' '+str(direction)+' '+str(at)
+                    outstr += ' ' + str(direction) + ' ' + str(at)
                 else:
                     outstr = str(at)
             print(outstr)
-
-
-
-
 
             return False
 
