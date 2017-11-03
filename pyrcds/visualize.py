@@ -32,7 +32,7 @@ def visualize_schema(schema: RelationalSchema, filename, title='untitled relatio
         for v in nodes:
             ax.scatter([pos[v][0]], [pos[v][1]],
                        s=300 / factor,
-                       c=pal[i],
+                       c=[pal[i]],
                        marker=marker_of(v),
                        alpha=1,
                        linewidths=0
@@ -42,7 +42,8 @@ def visualize_schema(schema: RelationalSchema, filename, title='untitled relatio
     nx.draw_networkx_labels(G, pos,
                             labels=dict((schema_element, schema_element.name) for schema_element in G.nodes),
                             font_size=9 - factor, ax=ax, alpha=1)
-
+    xmin, xmax = plt.xlim()
+    ymin, ymax = plt.ylim()
     plt.title(title)
     plt.tick_params(
         axis='both',  # changes apply to the x-axis
@@ -54,7 +55,7 @@ def visualize_schema(schema: RelationalSchema, filename, title='untitled relatio
         labelbottom='off')  # labels along the bottom edge are off
     fig.savefig(filename, transparent=True, bbox_inches='tight', pad_inches=0.02)
     plt.close()
-    return pos, pal, factor
+    return {'pos': pos, 'pal': pal, 'factor': factor, 'xmin': xmin, 'xmax': xmax, 'ymin': ymin, 'ymax': ymax}
 
 
 def visualize_ground_graph(gg: GroundGraph, filename, title='undirected Ground Graph', **options):
@@ -67,23 +68,37 @@ def visualize_ground_graph(gg: GroundGraph, filename, title='undirected Ground G
     else:
         fig, ax = plt.subplots(figsize=(options.get('figure_width', 6), options.get('figure_height', 6)))
     G = gg.as_networkx_dag()
-    pos = options.get('pos', nx.nx_agraph.graphviz_layout(G, prog=options.get('prog', 'neato')))
+
+    pos = options.get('pos', nx.nx_agraph.graphviz_layout(G, prog=options.get('prog', 'dot')))
     pal = options.get('pal', sns.color_palette(options.get('palette', "Paired"), len(schema.attrs)))
+    sorted_attrs = list(sorted(schema.attrs))
+
+    # for n in list(G.nodes):
+    #     if len(list(G.neighbors(n))) == 0:
+    #         G.remove_node(n)
 
     all_item_attributes = G.nodes()
     factor = options.get('factor', 2 * max(1, np.math.log(len(all_item_attributes) / np.math.log(8))))
 
-    for i, (attr, item_attributes) in enumerate(group_by(all_item_attributes, lambda ia: ia[1])):
+    if 'xmin' in options and 'xmax' in options:
+        plt.xlim((options.get('xmin'), options.get('xmax')))
+    if 'ymin' in options and 'ymax' in options:
+        plt.ylim((options.get('ymin'), options.get('ymax')))
+    for attr, item_attributes in group_by(all_item_attributes, lambda ia: ia[1], sort=True):
         xy = np.asarray([pos[v] for v in item_attributes])
         node_collection = ax.scatter(xy[:, 0], xy[:, 1],
                                      s=300 / factor,
-                                     c=pal[i],
+                                     c=[pal[sorted_attrs.index(attr)]],
                                      alpha=1,
                                      linewidths=0,
                                      label=attr)
         node_collection.set_zorder(2)
 
     nx.draw_networkx_edges(G, pos, arrows=True, ax=ax, width=0.5)
+    if 'edgelist' in options:
+        nx.draw_networkx_edges(G, pos, edgelist=options['edgelist'], arrows=True, ax=ax, width=0.5, edge_color='r')
+    xmin, xmax = plt.xlim()
+    ymin, ymax = plt.ylim()
     plt.title(title)
     ax.legend(loc='center left', bbox_to_anchor=(1, 0.5))
     plt.tick_params(
@@ -96,7 +111,7 @@ def visualize_ground_graph(gg: GroundGraph, filename, title='undirected Ground G
         labelbottom='off')  # labels along the bottom edge are off
     fig.savefig(filename, transparent=True, bbox_inches='tight', pad_inches=0.02)
     plt.close()
-    return pos, pal, factor
+    return {'pos': pos, 'pal': pal, 'factor': factor, 'xmin': xmin, 'xmax': xmax, 'ymin': ymin, 'ymax': ymax}
 
 
 def visualize_skeleton(skeleton: RelationalSkeleton, filename, title='relational skeleton', **options):
@@ -107,15 +122,20 @@ def visualize_skeleton(skeleton: RelationalSkeleton, filename, title='relational
     G = skeleton.as_networkx_ug()
     pos = options.get('pos', nx.nx_agraph.graphviz_layout(G, prog=options.get('prog', 'neato')))
     pal = options.get('pal', sns.color_palette(options.get('palette', "Paired"), len(skeleton.schema.item_classes)))
+    sorted_item_classes = list(sorted(skeleton.schema.item_classes))
 
     nodelist = list(G.nodes)
     factor = options.get('factor', max(1, np.math.log(len(nodelist) / np.math.log(8))))
 
-    for i, (item_class, nodes) in enumerate(group_by(nodelist, lambda node: node.item_class)):
+    if 'xmin' in options and 'xmax' in options:
+        plt.xlim((options.get('xmin'), options.get('xmax')))
+    if 'ymin' in options and 'ymax' in options:
+        plt.ylim((options.get('ymin'), options.get('ymax')))
+    for item_class, nodes in group_by(nodelist, lambda node: node.item_class):
         xy = np.asarray([pos[v] for v in nodes])
         node_collection = ax.scatter(xy[:, 0], xy[:, 1],
                                      s=(300 if isinstance(item_class, EntityClass) else 100) / factor,
-                                     c=pal[i],
+                                     c=[pal[sorted_item_classes.index(item_class)]],
                                      marker='s' if isinstance(item_class, EntityClass) else 'D',
                                      alpha=1,
                                      linewidths=0,
@@ -124,6 +144,8 @@ def visualize_skeleton(skeleton: RelationalSkeleton, filename, title='relational
 
     nx.draw_networkx_edges(G, pos, arrows=False, ax=ax, width=0.5)
     plt.title(title)
+    xmin, xmax = plt.xlim()
+    ymin, ymax = plt.ylim()
     ax.legend(loc='center left', bbox_to_anchor=(1, 0.5))
     plt.tick_params(
         axis='both',  # changes apply to the x-axis
@@ -134,5 +156,6 @@ def visualize_skeleton(skeleton: RelationalSkeleton, filename, title='relational
         labelleft='off',
         labelbottom='off')  # labels along the bottom edge are off
     fig.savefig(filename, transparent=True, bbox_inches='tight', pad_inches=0.02)
+
     plt.close()
-    return pos, pal, factor
+    return {'pos': pos, 'pal': pal, 'factor': factor, 'xmin': xmin, 'xmax': xmax, 'ymin': ymin, 'ymax': ymax}

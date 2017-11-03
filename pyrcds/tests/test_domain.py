@@ -3,7 +3,7 @@ import pytest
 
 from pyrcds.domain import SchemaElement, EntityClass, AttributeClass, Cardinality, RelationshipClass, RelationalSchema, generate_schema, \
     generate_skeleton, ImmutableRSkeleton, repeat_skeleton
-from pyrcds.tests.testing_utils import company_skeleton, EPBDF
+from pyrcds.tests.testing_utils import company_skeleton, EPBDF, company_schema
 
 
 def test_SchemaElement_fail_empty():
@@ -77,6 +77,22 @@ def test_EDPDE():
 
 def test_skeleton():
     company_skeleton()
+
+
+def test_to_code():
+    print()
+    print(company_schema().to_code())
+
+    BizUnit = EntityClass('BizUnit', (AttributeClass('Budget'), AttributeClass('Revenue')))
+    Employee = EntityClass('Employee', (AttributeClass('Competence'), AttributeClass('Salary')))
+    Product = EntityClass('Product', (AttributeClass('Success'),))
+    Develops = RelationshipClass('Develops', (), {Employee: Cardinality.many, Product: Cardinality.many})
+    Funds = RelationshipClass('Funds', (), {Product: Cardinality.one, BizUnit: Cardinality.many})
+    entities = {BizUnit, Employee, Product}
+    relationships = {Develops, Funds}
+    schema = RelationalSchema(entities, relationships)
+
+    assert schema.to_code() == company_schema().to_code()
 
 
 def test_skeleton_attribute():

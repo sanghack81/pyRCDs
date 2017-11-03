@@ -9,9 +9,9 @@ def test_all_three():
     visualize_schema(company_schema(), 'company_schema.pdf')
 
     sk = generate_skeleton(schema, 20)
-    pos, pal, factor = visualize_skeleton(sk, 'company_skeleton_before.pdf')
+    options = visualize_skeleton(sk, 'company_skeleton_before.pdf')
     remove_lone_entities(sk)
-    visualize_skeleton(sk, 'company_skeleton_after.pdf', pos=pos, pal=pal, factor=factor)
+    visualize_skeleton(sk, 'company_skeleton_after.pdf', **options)
 
     rcm = company_rcm()
     for prog in ['neato', 'dot', 'twopi', 'circo']:  # , 'fdp', , 'nop'

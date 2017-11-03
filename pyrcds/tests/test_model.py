@@ -6,9 +6,9 @@ from joblib import Parallel, delayed
 from networkx import is_directed_acyclic_graph
 from tqdm import trange
 
-from pyrcds.domain import AttributeClass, RelationalSkeleton, SkItem, generate_schema, generate_skeleton
+from pyrcds.domain import AttributeClass, RelationalSkeleton, SkItem, generate_schema, generate_skeleton, EntityClass, RelationshipClass, Cardinality, RelationalSchema
 from pyrcds.model import RelationalPath, llrsp, RelationalVariable, terminal_set, PRCM, UndirectedRDep, RCM, GroundGraph, generate_rcm, \
-    canonical_rvars, linear_gaussians_rcm, generate_values_for_skeleton, flatten, generate_rpath, is_valid_rpath
+    canonical_rvars, linear_gaussians_rcm, generate_values_for_skeleton, flatten, generate_rpath, is_valid_rpath, RelationalDependency
 from pyrcds.rcds import intersectable
 from pyrcds.tests.testing_utils import EPBDF, company_schema, company_rcm, company_skeleton, company_deps
 from pyrcds.utils import between_sampler
@@ -235,6 +235,26 @@ def test_rcm_orient_3():
     rcm = company_rcm()
     with pytest.raises(Exception):
         rcm.add({reversed(d) for d in deps})
+
+
+def test_to_code():
+    print(company_rcm().to_code())
+    BizUnit = EntityClass('BizUnit', (AttributeClass('Budget'), AttributeClass('Revenue')))
+    Employee = EntityClass('Employee', (AttributeClass('Competence'), AttributeClass('Salary')))
+    Product = EntityClass('Product', (AttributeClass('Success'),))
+    Develops = RelationshipClass('Develops', (), {Employee: Cardinality.many, Product: Cardinality.many})
+    Funds = RelationshipClass('Funds', (), {Product: Cardinality.one, BizUnit: Cardinality.many})
+    entities = {BizUnit, Employee, Product}
+    relationships = {Develops, Funds}
+    schema = RelationalSchema(entities, relationships)
+
+    rcm = RCM(schema, {RelationalDependency(RelationalVariable([Employee, Develops, Product, Funds, BizUnit], 'Budget'), RelationalVariable([Employee], 'Salary')),
+                       RelationalDependency(RelationalVariable([Product, Develops, Employee], 'Competence'), RelationalVariable([Product], 'Success')),
+                       RelationalDependency(RelationalVariable([Employee], 'Competence'), RelationalVariable([Employee], 'Salary')),
+                       RelationalDependency(RelationalVariable([BizUnit, Funds, Product], 'Success'), RelationalVariable([BizUnit], 'Revenue')),
+                       RelationalDependency(RelationalVariable([BizUnit], 'Revenue'), RelationalVariable([BizUnit], 'Budget'))})
+
+    assert rcm.directed_dependencies == company_rcm().directed_dependencies
 
 
 def test_rcm_gen():

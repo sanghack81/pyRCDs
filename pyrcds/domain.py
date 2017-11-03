@@ -191,19 +191,19 @@ class AttributeClass(SchemaElement):
 class RelationalSchema:
     """Relational schema"""
 
-    def __init__(self, entities, relationships):
+    def __init__(self, entities: Set[EntityClass], relationships: Set[RelationshipClass]):
         """Initialize a relational schema with given entity and relationship classes"""
         assert all(e.is_entity_class for e in entities)
         assert all(r.is_relationship_class for r in relationships)
         assert _is_unique((*_names(entities), *_names(relationships),
                            *[attr.name for item in (set(entities) | set(relationships)) for attr in item.attrs]))
 
-        self.entities = frozenset(entities)
-        self.relationships = frozenset(relationships)
-        self.entity_classes = self.entities
-        self.relationship_classes = self.relationships
-        self.item_classes = self.entities | self.relationships
-        self.attrs = frozenset(chain(*[i.attrs for i in chain(entities, relationships)]))
+        self.entities = frozenset(entities)  # type: FrozenSet[EntityClass]
+        self.relationships = frozenset(relationships)  # type: FrozenSet[RelationshipClass]
+        self.entity_classes = self.entities  # type: FrozenSet[EntityClass]
+        self.relationship_classes = self.relationships  # type: FrozenSet[RelationshipClass]
+        self.item_classes = self.entities | self.relationships  # type: FrozenSet[ItemClass]
+        self.attrs = frozenset(chain(*[i.attrs for i in chain(entities, relationships)]))  # type: FrozenSet[AttributeClass]
 
         __i2i = defaultdict(set)
         for r in relationships:
@@ -243,6 +243,30 @@ class RelationalSchema:
     def __repr__(self):
         return "RSchema(Entity classes: " + repr(sorted(self.entities)) + ", Relationship classes: " + repr(
             sorted(self.relationships)) + ")"
+
+    def to_code(self):
+        lines = list()
+        for e in sorted(self.entity_classes):
+            if len(e.attribute_classes) == 0:
+                attr_str = '()'
+            elif len(e.attribute_classes) == 1:
+                attr_str = f"(AttributeClass('{next(iter(e.attribute_classes)).name}'),)"
+            else:
+                attr_str = "(" + (', '.join(f"AttributeClass('{attr.name}')" for attr in sorted(e.attribute_classes))) + ")"
+            lines.append(f"{e.name} = EntityClass('{e.name}', {attr_str})")
+        for r in sorted(self.relationship_classes):
+            if len(r.attribute_classes) == 0:
+                attr_str = '()'
+            elif len(r.attribute_classes) == 1:
+                attr_str = f"(AttributeClass('{next(iter(r.attribute_classes)).name}'),)"
+            else:
+                attr_str = "(" + (', '.join(f"AttributeClass('{attr.name}')" for attr in sorted(r.attribute_classes))) + ")"
+            the_dict = '{' + ', '.join([e.name + ': ' + ('Cardinality.many' if r.is_many(e) else 'Cardinality.one') for e in r.entity_classes]) + '}'
+            lines.append(f"{r.name} = RelationshipClass('{r.name}', {attr_str}, {the_dict})")
+        lines.append(f'entities = {{{", ".join(e.name for e in sorted(self.entity_classes))}}}')
+        lines.append(f'relationships = {{{", ".join(r.name for r in sorted(self.relationship_classes))}}}')
+        lines.append("schema = RelationalSchema(entities, relationships)")
+        return '\n'.join(lines)
 
     def relateds(self, item_class: ItemClass) -> frozenset:
         """Neighboring item classes of the given item class"""

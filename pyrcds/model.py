@@ -562,6 +562,11 @@ class RCM(PRCM):
         assert not isinstance(d, UndirectedRDep)
         super().add(d)
 
+    def to_code(self):
+        joined = ', '.join([f"RelationalDependency(RelationalVariable({str(d.cause.rpath)},'{d.cause.attr.name}'), RelationalVariable({str(d.effect.rpath)},'{d.effect.attr.name}'))" for d in
+                            self.directed_dependencies])
+        return "rcm = RCM(schema, {" + joined + "})"
+
 
 class ParamRCM(RCM):
     """Parametrized Relational Causal Model"""
@@ -713,6 +718,9 @@ class SkeletonDataInterface:
         return np.array([next(iter(terminal_set(self.skeleton, rvar.rpath, b)))[rvar.attr] for b in self.base_items[rvar.base]])
 
 
+ItemAttribute = namedtuple('ItemAttribute', ['item', 'attr'])
+
+
 class GroundGraph:
     """Ground graph"""
 
@@ -731,8 +739,6 @@ class GroundGraph:
 
         def k_fun(d):
             return d.effect.rpath.base
-
-        ItemAttribute = namedtuple('ItemAttribute', ['item', 'attr'])
 
         as_rdeps = {dep1 for dep1, _ in rcm.undirected_dependencies}
         for base_item_class, rdeps in group_by(as_rdeps, k_fun):
