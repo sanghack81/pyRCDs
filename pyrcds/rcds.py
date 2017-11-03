@@ -1,6 +1,7 @@
 import functools
 import itertools
 import logging
+import typing
 from collections import deque, defaultdict
 from itertools import takewhile, count, combinations
 
@@ -614,7 +615,7 @@ def sound_rules(g: PDAG, non_colliders=(), purge=True):
             break
 
 
-def completes(g: PDAG, non_colliders):
+def completes(g: PDAG, non_colliders: typing.Set):
     """Maximally orients edges in the given PDAG with non-collider constraints"""
     U = unions({(x, y), (y, x)} for x, y in g.unoriented())
 
@@ -636,7 +637,7 @@ def completes(g: PDAG, non_colliders):
             U -= {(x, y), (y, x)}
 
 
-def ext(g: PDAG, NC):
+def ext(g: PDAG, NC: typing.Set) -> bool:
     """Extensibility where non-colliders are completely identified."""
     h = g.copy()
     while h:

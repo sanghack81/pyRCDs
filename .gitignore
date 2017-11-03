@@ -6,5 +6,4 @@ doc/
 temporary
 build
 pyRCDs.egg-info
-pyrcds/visualize.py
 .coverage*
