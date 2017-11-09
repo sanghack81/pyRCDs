@@ -18,7 +18,7 @@ def visualize_schema(schema: RelationalSchema, filename, title='untitled relatio
     pal = options.get('pal', sns.color_palette(options.get('palette', "Paired"), 3))
 
     num_to_display = len(schema.item_classes) + len(schema.attrs)
-    factor = options.get('factor', max(1, np.math.log((num_to_display) / np.math.log(8))) / 2)
+    factor = options.get('factor', max(1, np.math.log(1 + (num_to_display) / np.math.log(8))) / 2)
 
     def marker_of(node):
         if isinstance(node, EntityClass):
@@ -78,7 +78,7 @@ def visualize_ground_graph(gg: GroundGraph, filename, title='undirected Ground G
     #         G.remove_node(n)
 
     all_item_attributes = G.nodes()
-    factor = options.get('factor', 2 * max(1, np.math.log(len(all_item_attributes) / np.math.log(8))))
+    factor = options.get('factor', 2 * max(1, np.math.log(1 + len(all_item_attributes) / np.math.log(8))))
 
     if 'xmin' in options and 'xmax' in options:
         plt.xlim((options.get('xmin'), options.get('xmax')))
@@ -94,7 +94,7 @@ def visualize_ground_graph(gg: GroundGraph, filename, title='undirected Ground G
                                      label=attr)
         node_collection.set_zorder(2)
 
-    nx.draw_networkx_edges(G, pos, arrows=True, ax=ax, width=0.5)
+    nx.draw_networkx_edges(G, pos, arrows=True, ax=ax, width=0.25 if 'edgelist' in options else 0.5, alpha=0.2 if 'edgelist' in options else 1.0)
     if 'edgelist' in options:
         nx.draw_networkx_edges(G, pos, edgelist=options['edgelist'], arrows=True, ax=ax, width=0.5, edge_color='r')
     xmin, xmax = plt.xlim()
@@ -125,7 +125,7 @@ def visualize_skeleton(skeleton: RelationalSkeleton, filename, title='relational
     sorted_item_classes = list(sorted(skeleton.schema.item_classes))
 
     nodelist = list(G.nodes)
-    factor = options.get('factor', max(1, np.math.log(len(nodelist) / np.math.log(8))))
+    factor = options.get('factor', max(1, np.math.log(1 + len(nodelist) / np.math.log(8))))
 
     if 'xmin' in options and 'xmax' in options:
         plt.xlim((options.get('xmin'), options.get('xmax')))
