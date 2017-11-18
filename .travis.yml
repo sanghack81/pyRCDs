@@ -3,7 +3,7 @@ python:
   - "3.6"
 
 before_install:
-  - "sudo apt-get install graphviz"
+  - "sudo apt-get install -y graphviz libgraphviz-dev pkg-config python-pip"
 
 install:
   - pip install --upgrade pip
