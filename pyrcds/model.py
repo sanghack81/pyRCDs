@@ -358,6 +358,9 @@ class SymTriple:
     def __str__(self):
         return '<' + (', '.join(str(t) for t in (self.left, self.middle, self.right))) + '>'
 
+    def __repr__(self):
+        return f"SymTriple({(', '.join(str(t) for t in (self.left, self.middle, self.right)))})"
+
     def __lt__(self, other):
         return sorted([*self]) < sorted([*other])
 
@@ -414,6 +417,9 @@ class PRCM:
         self.neighbors = defaultdict(set)
 
         self.add(dependencies)
+
+    def copy(self):
+        return PRCM(self.schema, self.directed_dependencies | self.undirected_dependencies)
 
     @property
     def valid_dependencies(self):
