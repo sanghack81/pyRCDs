@@ -1,3 +1,9 @@
+import os
+
+import matplotlib as mpl
+
+if os.environ.get('DISPLAY', '') == '':
+    mpl.use('Agg')
 import matplotlib.pyplot as plt
 import networkx as nx
 import numpy as np
