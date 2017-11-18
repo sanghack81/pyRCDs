@@ -50,7 +50,6 @@ class ratio_sampler:
         self.ratios = self.ratios / self.ratios.sum()
         self.pre_sampled = deque()
 
-
     def sample(self, size=None):
         if size is None:
             if not self.pre_sampled:
