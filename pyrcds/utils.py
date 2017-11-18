@@ -1,6 +1,6 @@
 import types
 import typing
-from collections import OrderedDict
+from collections import OrderedDict, deque
 from itertools import groupby, chain
 
 import numpy as np
@@ -40,6 +40,24 @@ def group_by(xs: typing.Iterable[T], keyfunc, sort=False) -> typing.Iterator[typ
         kgs = [(k, list(sorted(g))) for k, g in groupby(sorted(xs, key=keyfunc), key=keyfunc)]
         kgs = sorted(kgs, key=lambda kg: kg[0])  # TODO Is it necessary?
         return iter(kgs)
+
+
+class ratio_sampler:
+    def __init__(self, value_ratio_dict: dict):
+        self.values = list(value_ratio_dict.keys())
+        self.ratios = np.array([value_ratio_dict[v] for v in self.values])
+        assert np.all(self.ratios > 0)
+        self.ratios = self.ratios / self.ratios.sum()
+        self.pre_sampled = deque()
+
+
+    def sample(self, size=None):
+        if size is None:
+            if not self.pre_sampled:
+                self.pre_sampled.extend(np.random.choice(self.values, size=32, replace=True, p=self.ratios))
+            return self.pre_sampled.pop()
+        else:
+            return np.random.choice(self.values, size=size, replace=True, p=self.ratios)
 
 
 class between_sampler:

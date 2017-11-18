@@ -1,7 +1,15 @@
 import typing
 
 from pyrcds.utils import between_sampler, average_agg, max_agg, normal_sampler, linear_gaussian, group_by, \
-    unions, LRUCache, safe_iter
+    unions, LRUCache, safe_iter, ratio_sampler
+
+
+def test_ratio_sampler():
+    ss = ratio_sampler({0: 0.3, 1: 0.7})
+    n =  10000
+    sampled = ss.sample(n)
+    assert 0.25 < sum(sampled == 0)/n < 0.35
+    assert 0.65 < sum(sampled == 1)/n < 0.75
 
 
 def test_group_by():
