@@ -2,7 +2,7 @@ import functools
 import itertools
 import logging
 import typing
-from collections import deque, defaultdict
+from collections import deque, defaultdict, namedtuple
 from itertools import takewhile, count, combinations
 
 import networkx as nx
@@ -1034,6 +1034,34 @@ def markov_equivalence(model: RCM, verbose=False) -> PRCM:
         cprcm.orient_with(x, y)
 
     return cprcm
+
+
+def rbos_colliders_non_colliders(model: RCM):
+    cdg = model.class_dependency_graph
+
+    rbos = set()
+    colliders = set()
+    non_colliders = set()
+
+    for cut in canonical_unshielded_triples(model):
+        Vx, PPy, Rz = cut
+        Py = next(iter(PPy))
+        (_, X), (_, Y), (_, Z) = Vx, Py, Rz
+
+        xyz = SymTriple(X, Y, Z)
+        if xyz in non_colliders:
+            continue
+        if xyz in colliders:
+            continue
+
+        if X == Z:  # RBO
+            rbos.add((X, Y) if cdg.is_oriented_as(X, Y) else (Y, X))
+        elif cdg.is_oriented_as(X, Y) and cdg.is_oriented_as(Z, Y):
+            colliders.add(xyz)
+        else:
+            non_colliders.add(xyz)
+
+    return namedtuple('OrientableTestsStats', ['rbos', 'colliders', 'non_colliders'])(frozenset(rbos), frozenset(colliders), frozenset(non_colliders))
 
 
 def markov_equivalent(model1: RCM, model2: RCM):
