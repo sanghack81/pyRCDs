@@ -342,8 +342,8 @@ class SymTriple:
 
     def __eq__(self, other):
         return isinstance(other, SymTriple) and \
-               ((self.left, self.right, self.middle) == (other.left, other.right, other.middle) or \
-               (self.right, self.left, self.middle) == (other.left, other.right, other.middle))
+               ((self.left, self.right, self.middle) == (other.left, other.right, other.middle) or
+                (self.right, self.left, self.middle) == (other.left, other.right, other.middle))
 
     def __iter__(self):
         return iter((self.left, self.middle, self.right))
@@ -363,7 +363,6 @@ class SymTriple:
 
     def __lt__(self, other):
         return sorted(self.sides()) + [self.middle] < sorted(other.sides()) + [other.middle]
-        # return sorted([*self]) < sorted([*other])
 
 
 @functools.total_ordering
