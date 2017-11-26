@@ -14,5 +14,5 @@ def test_all_three():
     visualize_skeleton(sk, 'company_skeleton_after.pdf', **options)
 
     rcm = company_rcm()
-    for prog in ['neato', 'dot', 'twopi', 'circo']:  # , 'fdp', , 'nop'
+    for prog in ['neato', 'dot', 'twopi']:  # , 'circo', 'fdp', , 'nop'
         visualize_ground_graph(GroundGraph(rcm, sk), f'company_gg_{prog}.pdf', prog=prog)
