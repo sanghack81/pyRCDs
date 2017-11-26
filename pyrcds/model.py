@@ -362,7 +362,8 @@ class SymTriple:
         return f"SymTriple({(', '.join(str(t) for t in (self.left, self.middle, self.right)))})"
 
     def __lt__(self, other):
-        return sorted([*self]) < sorted([*other])
+        return sorted(self.sides()) + [self.middle] < sorted(other.sides()) + [other.middle]
+        # return sorted([*self]) < sorted([*other])
 
 
 @functools.total_ordering

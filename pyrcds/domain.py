@@ -156,7 +156,7 @@ class RelationshipClass(ItemClass):
     def to_dict(self):
         return {'name': self.name,
                 'attrs': [a.name for a in self.attrs],
-                'cards': {e.name: self.__cards[e] for e in self.__cards}}
+                'cards': {e.name: int(self.__cards[e]) for e in self.__cards}}
 
     @staticmethod
     def from_dict(dic, es):
