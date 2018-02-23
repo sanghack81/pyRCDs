@@ -2,7 +2,7 @@ import functools
 import typing
 from collections import defaultdict, namedtuple, deque
 from itertools import cycle, product, combinations
-from typing import Set
+from typing import Set, Optional, Union
 
 import networkx as nx
 import numpy as np
@@ -55,7 +55,7 @@ def is_valid_rpath(path) -> bool:
 class RelationalPath:
     """Relational path"""
 
-    def __init__(self, item_classes, backdoor=False):
+    def __init__(self, item_classes: Union[ItemClass, typing.List[ItemClass]], backdoor=False):
         """
 
         Parameters
@@ -126,32 +126,32 @@ class RelationalPath:
     def is_canonical(self):
         return len(self.__item_classes) == 1
 
-    def subpath(self, start, end):
+    def subpath(self, start, end) -> 'RelationalPath':
         assert 0 <= start < end <= len(self)
         return RelationalPath(self.__item_classes[start:end])
 
-    def __reversed__(self):
+    def __reversed__(self) -> 'RelationalPath':
         return RelationalPath(tuple(reversed(self.__item_classes)), True)
 
     def reverse(self) -> 'RelationalPath':
         return RelationalPath(tuple(reversed(self.__item_classes)), True)
 
     @property
-    def hop_len(self):
+    def hop_len(self) -> int:
         return len(self) - 1
 
     @property
-    def terminal(self):
+    def terminal(self) -> ItemClass:
         return self.__item_classes[-1]
 
     @property
-    def base(self):
+    def base(self) -> ItemClass:
         return self.__item_classes[0]
 
     def __len__(self):
         return len(self.__item_classes)
 
-    def appended_or_none(self, item_class: ItemClass):
+    def appended_or_none(self, item_class: ItemClass) -> Optional['RelationalPath']:
         if len(self) > 1:
             if is_valid_rpath(self.__item_classes[-2:] + (item_class,)):
                 return RelationalPath(self.__item_classes + (item_class,), True)
@@ -164,7 +164,7 @@ class RelationalPath:
                     return RelationalPath(self.__item_classes + (item_class,), True)
         return None
 
-    def joinable(self, rpath):
+    def joinable(self, rpath) -> bool:
         if self.terminal != rpath.base:
             return False
         if len(self) > 1 and len(rpath) > 1:
@@ -211,7 +211,7 @@ def llrsp(p1: RelationalPath, p2: RelationalPath) -> int:
 class RelationalVariable:
     """Relational variable"""
 
-    def __init__(self, rpath, attr):
+    def __init__(self, rpath: Union[RelationalPath, ItemClass, typing.List[ItemClass]], attr: typing.Union[str, AttributeClass]):
         if not isinstance(rpath, RelationalPath):
             rpath = RelationalPath(rpath)
         if isinstance(attr, str):
@@ -298,7 +298,7 @@ class RelationalDependency:
         return len(self) - 1
 
     # reversed(P.X --> Vy) = ~P.Y --> Vx
-    def __reversed__(self):
+    def __reversed__(self) -> 'RelationalDependency':
         new_cause = RelationalVariable(self.cause.rpath.reverse(), self.effect.attr)
         new_effect = RelationalVariable(RelationalPath(self.cause.terminal), self.cause.attr)
         return RelationalDependency(new_cause, new_effect)
@@ -876,7 +876,7 @@ def _item_attributes(items, attr: AttributeClass):
     return {(item, attr) for item in items}
 
 
-def generate_values_for_skeleton(rcm: ParamRCM, skeleton: RelationalSkeleton):
+def generate_values_for_skeleton(rcm: ParamRCM, skeleton: RelationalSkeleton, seed=None):
     """
     Generate values for the given skeleton based on functions specified in the parametrized RCM.
 
@@ -887,12 +887,19 @@ def generate_values_for_skeleton(rcm: ParamRCM, skeleton: RelationalSkeleton):
     skeleton : RelationalSkeleton
         a skeleton where values will be assigned to its item-attributes
     """
+    if seed is not None:
+        np.random.seed(seed)
+
+    # topological sort may not be uniquely determined
+    seeds = {attr: np.random.randint(np.iinfo(np.int32).max) for attr in sorted(rcm.schema.attrs)}
     cdg = rcm.class_dependency_graph
+
     nx_cdg = cdg.as_networkx_dag()
     ordered_attributes = list(nx.topological_sort(nx_cdg))
     ordered_attributes += list(set(rcm.schema.attrs) - set(ordered_attributes))
 
     for attr in ordered_attributes:
+        np.random.seed(seeds[attr])
         base_item_class = rcm.schema.item_class_of(attr)
         effect = RelationalVariable(RelationalPath(base_item_class), attr)
         causes = rcm.pa(effect)
@@ -922,13 +929,17 @@ def normalize_skeleton(skeleton: RelationalSkeleton):
             item[crv.attr] = (item[crv.attr] - mu) / std
 
 
-def linear_gaussians_rcm(rcm: RCM):
+def linear_gaussians_rcm(rcm: RCM, seed=None):
     """Parameterized RCM as a linear model with Gaussian additive noise."""
+    if seed is not None:
+        np.random.seed(seed)
+
     functions = dict()
-    effects = {RelationalVariable(RelationalPath(rcm.schema.item_class_of(attr)), attr) for attr in rcm.schema.attrs}
+    effects = [RelationalVariable(RelationalPath(rcm.schema.item_class_of(attr)), attr)
+               for attr in sorted(rcm.schema.attrs)]
 
     for e in effects:
-        parameters = {cause: 1.0 + 0.1 * abs(randn()) for cause in rcm.pa(e)}
+        parameters = {cause: 1.0 + 0.1 * abs(randn()) for cause in sorted(rcm.pa(e))}
         functions[e] = linear_gaussian(parameters, average_agg(), normal_sampler(0, 0.1))
 
     return ParamRCM(rcm.schema, rcm.directed_dependencies, functions)

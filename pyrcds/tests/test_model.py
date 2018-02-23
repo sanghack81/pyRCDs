@@ -80,11 +80,11 @@ def test_rpath_4():
     assert E == RelationalPath([D, P, D, E]).terminal
     assert D == RelationalPath([D, P, D, E]).base
     assert P == RelationalPath([D, P, D, E])[1]
-    assert RelationalPath([D, P, D, E]).reverse() == RelationalPath(tuple(reversed([D, P, D, E]))) == RelationalPath([E, D, P, D])
+    assert RelationalPath([D, P, D, E]).reverse() == RelationalPath(list(reversed([D, P, D, E]))) == RelationalPath([E, D, P, D])
     RelationalPath([D, P, F, B])
     RelationalPath([D, P, F, B, F])
     RelationalPath([D, P, F, B, F, P])
-    assert RelationalPath([D, P, F, B, F, P])[2:5] == RelationalPath((F, B, F, P))
+    assert RelationalPath([D, P, F, B, F, P])[2:5] == RelationalPath([F, B, F, P])
     assert RelationalPath([D, P, F, B, F, P]).subpath(2, 5) == RelationalPath([F, B, F])
     RelationalPath([D, P, F, B, F, P, D])
     RelationalPath([D, P, F, B, F, P, D, E])

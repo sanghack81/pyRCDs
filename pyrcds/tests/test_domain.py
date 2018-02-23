@@ -45,34 +45,28 @@ def test_EDPDE():
     assert E not in F
     assert D not in F
     assert F not in F
-    company_schema = RelationalSchema({E, P, B}, {D, F})
-    assert company_schema.item_class_of(AttributeClass('Salary')) == E
-    assert company_schema.item_class_of(AttributeClass('Revenue')) == B
-    assert AttributeClass('Salary') in company_schema
-    assert E in company_schema
-    assert xx1 not in company_schema
-    assert AttributeClass('celery') not in company_schema
-    assert str(company_schema) == 'RSchema(BizUnit, Develops, Employee, Funds, Product)'
-    # print(repr(company_schema))
+    schema = RelationalSchema({E, P, B}, {D, F})
+    assert schema.item_class_of(AttributeClass('Salary')) == E
+    assert schema.item_class_of(AttributeClass('Revenue')) == B
+    assert AttributeClass('Salary') in schema
+    assert E in schema
+    assert xx1 not in schema
+    assert AttributeClass('celery') not in schema
+    assert str(schema) == 'RSchema(BizUnit, Develops, Employee, Funds, Product)'
     assert repr(
-        company_schema) == "RSchema(Entity classes: [" \
-                           "BizUnit(Budget, Revenue), " \
-                           "Employee(Competence, Salary), " \
-                           "Product(Success)" \
-                           "], " \
-                           "Relationship classes: [" \
-                           "Develops(dummy1, dummy2, {Employee: many, Product: many}), " \
-                           "Funds((), {BizUnit: many, Product: one})" \
-                           "])"
+        schema) == "RSchema(Entity classes: [" \
+                   "BizUnit(Budget, Revenue), " \
+                   "Employee(Competence, Salary), " \
+                   "Product(Success)" \
+                   "], " \
+                   "Relationship classes: [" \
+                   "Develops(dummy1, dummy2, {Employee: many, Product: many}), " \
+                   "Funds((), {BizUnit: many, Product: one})" \
+                   "])"
 
-    # e2 = E.removed({A_Class('Salary'), })
-    # d2 = D.removed({A_Class('dummy1'), E})
-    # d3 = D.removed({A_Class('dummy1'), e2})
-    # assert d2 == d3
-
-    assert company_schema.relateds(B) == {F, }
-    assert company_schema.relateds(P) == {D, F}
-    assert company_schema.relateds(E) == {D, }
+    assert schema.relateds(B) == {F, }
+    assert schema.relateds(P) == {D, F}
+    assert schema.relateds(E) == {D, }
 
 
 def test_skeleton():

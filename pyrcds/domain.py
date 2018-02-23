@@ -1,10 +1,10 @@
 import functools
 import itertools
-from collections import defaultdict, Counter
+from collections import defaultdict, Counter, Collection
 from enum import IntEnum
 from functools import total_ordering
 from itertools import chain
-from typing import Set
+from typing import Set, FrozenSet
 
 import networkx as nx
 from numpy.random.mtrand import random_sample, choice, randint
@@ -206,7 +206,7 @@ class RelationalSchema:
         self.attrs = frozenset(chain(*[i.attrs for i in chain(entities, relationships)]))  # type: FrozenSet[AttributeClass]
 
         __i2i = defaultdict(set)
-        for r in relationships:
+        for r in self.relationships:
             __i2i[r] = r.entities
             for e in r.entities:
                 __i2i[e].add(r)
@@ -293,7 +293,7 @@ class RelationalSchema:
     def from_dict(dic):
         es = [EntityClass.from_dict(e) for e in dic['entities']]
         return RelationalSchema(es,
-                                [RelationshipClass.from_dict(r, es) for r in dic['relationships']])
+                                {RelationshipClass.from_dict(r, es) for r in dic['relationships']})
 
 
 @functools.total_ordering
