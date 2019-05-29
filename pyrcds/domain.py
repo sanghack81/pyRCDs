@@ -1,6 +1,6 @@
 import functools
 import itertools
-from collections import defaultdict, Counter, Collection
+from collections import defaultdict, Counter
 from enum import IntEnum
 from functools import total_ordering
 from itertools import chain
@@ -29,7 +29,7 @@ class Cardinality(IntEnum):
             return Cardinality.one
         elif v == 2:
             return Cardinality.many
-        raise ValueError('unknown Cardinality: {}'.format(v))
+        raise ValueError(f'unknown Cardinality: {v}')
 
 
 def _names(ys) -> Set[str]:

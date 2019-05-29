@@ -100,9 +100,9 @@ def visualize_ground_graph(gg: GroundGraph, filename, title='undirected Ground G
                                      label=attr)
         node_collection.set_zorder(2)
 
-    nx.draw_networkx_edges(G, pos, arrows=True, ax=ax, width=0.25 if 'edgelist' in options else 0.5, alpha=0.2 if 'edgelist' in options else 1.0)
+    nx.draw_networkx_edges(G, pos, arrowstyle='-|>', arrowsize=10, ax=ax, width=0.25 if 'edgelist' in options else 0.5, alpha=0.2 if 'edgelist' in options else 1.0)
     if 'edgelist' in options:
-        nx.draw_networkx_edges(G, pos, edgelist=options['edgelist'], arrows=True, ax=ax, width=0.5, edge_color='r')
+        nx.draw_networkx_edges(G, pos, edgelist=options['edgelist'], arrowstyle='-|>', arrowsize=10, ax=ax, width=0.5, edge_color='r')
     xmin, xmax = plt.xlim()
     ymin, ymax = plt.ylim()
     plt.title(title)
