@@ -1,7 +1,7 @@
 tqdm
 pytest
 matplotlib
-networkx
+networkx>=2.1
 numpy
 seaborn
 joblib
