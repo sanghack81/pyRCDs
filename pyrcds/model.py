@@ -1,7 +1,7 @@
 import functools
 from collections import defaultdict, namedtuple, deque
 from itertools import cycle, product, combinations
-from typing import Set, Optional, Union, Tuple, Generator, List
+from typing import Set, Optional, Union, Tuple, Generator, List, Sequence
 
 import networkx as nx
 import numpy as np
@@ -669,9 +669,12 @@ def __inner_flatten(skeleton, rvar, base_items, value_only):
 
 
 class SkeletonDataInterface:
-    """Fetches relational data as a table from given skeleton"""
+    """Fetches relational data as a table from a given skeleton
 
-    def __init__(self, skeleton: RelationalSkeleton, cache_maxsize=128, to_shuffle=True, skip_copy=False):
+    Internally uses an LRU cache for the faster retrieval of repeated requests.
+    """
+
+    def __init__(self, skeleton: RelationalSkeleton, *, cache_maxsize=128, to_shuffle=True, skip_copy=False):
         self.skeleton = skeleton if skip_copy else ImmutableRSkeleton(skeleton)
         self.base_items = dict()
         for ic in sorted(self.skeleton.schema.item_classes):
@@ -684,8 +687,14 @@ class SkeletonDataInterface:
         # enable lru cache
         self.inner_flatten = functools.lru_cache(maxsize=cache_maxsize)(self.inner_flatten)
 
-    def flatten(self, rvars, with_base_items=False, value_only=False):
-        """Relational data as a table where columns corresponding to rvars. If with_base_items set True, base items are used as an index (the first column)"""
+    def flatten(self, rvars: Sequence[RelationalVariable], with_base_items=False, value_only=False) -> np.ndarray:
+        """Relational data as a table where columns corresponding to rvars. If with_base_items set True, base items are used as an index (the first column)
+
+        Returns a numpy array where there are columns corresponding to given relational variables (`rvars`) together.
+        A column for base item is inserted as the first column if `with_base_items` is set `True`.
+        For the representation for each cell, please refer to `inner_flatten`.
+        """
+        assert rvars, "rvars cannot be empty."
         rvars = tuple(rvars)
         assert len({rvar.base for rvar in rvars}) == 1, "Relational variables do not share the same base class: {}".format(rvars)
         base_class = rvars[0].base
@@ -700,7 +709,14 @@ class SkeletonDataInterface:
 
         return data
 
-    def inner_flatten(self, rvar, value_only=False, sort=True):
+    def inner_flatten(self, rvar: RelationalVariable, value_only=False, sort=True) -> np.ndarray:
+        """
+        A 1-dimensional numpy array is returned with the number of base items corresponding to the base item class of the given relational variable.
+        Each element corresponds to the values of item attributes reached by the terminal set of a base item with respect to the relational variable.
+
+        By default, each element is a (sorted) tuple of pairs of an item and its item attribute.
+        If value_only is requested, each element is a (sorted) tuple of values.
+        """
         base_items = self.base_items[rvar.base]
         skeleton = self.skeleton
 
@@ -719,8 +735,8 @@ class SkeletonDataInterface:
                     inner_data[i] = tuple((item, item[rvar.attr]) for item in terminal)
         return inner_data
 
-    def fetch_singleton(self, rvar: RelationalVariable):
-        """ an array of attribute values ordered based on self.base_items """
+    def fetch_singleton(self, rvar: RelationalVariable) -> np.ndarray:
+        """ a numpy array of attribute values ordered following `self.base_items` """
         assert rvar.is_canonical
         return np.array([next(iter(terminal_set(self.skeleton, rvar.rpath, b)))[rvar.attr]
                          for b in self.base_items[rvar.base]])
