@@ -120,19 +120,19 @@ def test_skeleton():
     skeleton = RelationalSkeleton(company_schema(), True)
     p, r, q, s, t, c, a, l, ta, sm, ac, d = ents = tuple([SkItem(e, entity_types[e]) for e in entities])
     skeleton.add_entities(*ents)
-    for emp, prods in ((p, {c, }), (q, {c, a, l}), (s, {l, ta}), (t, {sm, ta}), (r, {l, })):
+    for emp, prods in ((p, {c}), (q, {c, a, l}), (s, {l, ta}), (t, {sm, ta}), (r, {l})):
         for prod in prods:
             skeleton.add_relationship(SkItem(emp.name + '-' + prod.name, D), {emp, prod})
     for biz, prods in ((ac, {c, a}), (d, {l, ta, sm})):
         for prod in prods:
             skeleton.add_relationship(SkItem(biz.name + '-' + prod.name, F), {biz, prod})
 
-    assert terminal_set(skeleton, RelationalPath([E, D, P, F, B]), p) == {ac, }
+    assert terminal_set(skeleton, RelationalPath([E, D, P, F, B]), p) == {ac}
     assert terminal_set(skeleton, RelationalPath([E, D, P, F, B]), q) == {ac, d}
     assert terminal_set(skeleton, RelationalPath([E, D, P, D, E]), r) == {q, s}
     assert terminal_set(skeleton, RelationalPath([E, D, P, D, E, D, P]), r) == {c, a, ta}
 
-    assert terminal_set(skeleton, RelationalPath([E, D, P, F, B]), p, 'bridge-burning') == {ac, }
+    assert terminal_set(skeleton, RelationalPath([E, D, P, F, B]), p, 'bridge-burning') == {ac}
     assert terminal_set(skeleton, RelationalPath([E, D, P, F, B]), q, 'bridge-burning') == {ac, d}
     assert terminal_set(skeleton, RelationalPath([E, D, P, D, E]), r, 'bridge-burning') == {q, s}
     assert terminal_set(skeleton, RelationalPath([E, D, P, D, E, D, P]), r, 'bridge-burning') == {c, a, ta}
@@ -192,8 +192,8 @@ def test_rcm():
     cdg = urcm.class_dependency_graph
     assert cdg.adj(AttributeClass('Revenue')) == {AttributeClass('Success'), AttributeClass('Budget')}
     assert cdg.ne(AttributeClass('Revenue')) == set()
-    assert cdg.pa(AttributeClass('Revenue')) == {AttributeClass('Success'), }
-    assert cdg.ch(AttributeClass('Revenue')) == {AttributeClass('Budget'), }
+    assert cdg.pa(AttributeClass('Revenue')) == {AttributeClass('Success')}
+    assert cdg.ch(AttributeClass('Revenue')) == {AttributeClass('Budget')}
 
     rcm = RCM(company_schema(), [])
     assert rcm.max_hop == -1

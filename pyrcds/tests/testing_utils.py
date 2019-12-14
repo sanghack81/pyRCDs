@@ -21,6 +21,7 @@ def EPBDF():
     return E, P, B, D, F
 
 
+@functools.lru_cache(1)
 def EPBDF_many():
     E = EntityClass('Employee', ('Salary', 'Competence'))
     P = EntityClass('Product', (AttributeClass('Success'),))
@@ -100,7 +101,7 @@ def company_skeleton():
     skeleton = RelationalSkeleton(company_schema(), True)
     p, r, q, s, t, c, a, l, ta, sm, ac, d = ents = tuple([SkItem(e, entity_types[e]) for e in entities])
     skeleton.add_entities(*ents)
-    for emp, prods in ((p, {c, }), (q, {c, a, l}), (s, {l, ta}), (t, {sm, ta}), (r, {l, })):
+    for emp, prods in ((p, {c}), (q, {c, a, l}), (s, {l, ta}), (t, {sm, ta}), (r, {l})):
         for prod in prods:
             skeleton.add_relationship(SkItem(emp.name + '-' + prod.name, D), {emp, prod})
     for biz, prods in ((ac, {c, a}), (d, {l, ta, sm})):

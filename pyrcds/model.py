@@ -1,8 +1,7 @@
 import functools
-import typing
 from collections import defaultdict, namedtuple, deque
 from itertools import cycle, product, combinations
-from typing import Set, Optional, Union
+from typing import Set, Optional, Union, Tuple, Generator, List
 
 import networkx as nx
 import numpy as np
@@ -55,7 +54,7 @@ def is_valid_rpath(path) -> bool:
 class RelationalPath:
     """Relational path"""
 
-    def __init__(self, item_classes: Union[ItemClass, typing.List[ItemClass]], backdoor=False):
+    def __init__(self, item_classes: Union[ItemClass, List[ItemClass]], backdoor=False):
         """
 
         Parameters
@@ -116,7 +115,7 @@ class RelationalPath:
         else:
             raise ValueError('unknown {}'.format(item))
 
-    def __pow__(self, other):
+    def __pow__(self, other: 'RelationalPath') -> Optional['RelationalPath']:
         """Concatenate two paths."""
         if self.joinable(other):
             return self.join(other, True)
@@ -138,6 +137,7 @@ class RelationalPath:
 
     @property
     def hop_len(self) -> int:
+        """ Hop length is the edge length of a relational path """
         return len(self) - 1
 
     @property
@@ -164,14 +164,14 @@ class RelationalPath:
                     return RelationalPath(self.__item_classes + (item_class,), True)
         return None
 
-    def joinable(self, rpath) -> bool:
+    def joinable(self, rpath: 'RelationalPath') -> bool:
         if self.terminal != rpath.base:
             return False
         if len(self) > 1 and len(rpath) > 1:
             return is_valid_rpath([self.__item_classes[-2], self.__item_classes[-1], rpath.__item_classes[1]])
         return True
 
-    def join(self, rpath, backdoor=False):
+    def join(self, rpath: 'RelationalPath', backdoor=False) -> 'RelationalPath':
         if not backdoor:
             assert self.joinable(rpath)
         return RelationalPath(self.__item_classes + rpath.__item_classes[1:], True)
@@ -211,7 +211,7 @@ def llrsp(p1: RelationalPath, p2: RelationalPath) -> int:
 class RelationalVariable:
     """Relational variable"""
 
-    def __init__(self, rpath: Union[RelationalPath, ItemClass, typing.List[ItemClass]], attr: typing.Union[str, AttributeClass]):
+    def __init__(self, rpath: Union[RelationalPath, ItemClass, List[ItemClass]], attr: Union[str, AttributeClass]):
         if not isinstance(rpath, RelationalPath):
             rpath = RelationalPath(rpath)
         if isinstance(attr, str):
@@ -258,7 +258,7 @@ class RelationalVariable:
         return str(self)
 
 
-def canonical_rvars(schema: RelationalSchema):
+def canonical_rvars(schema: RelationalSchema) -> Set[RelationalVariable]:
     """Returns all canonical relational variables given schema"""
     return set(RelationalVariable(RelationalPath(item_class), attr)
                for item_class in schema.item_classes
@@ -315,7 +315,7 @@ class RelationalDependency:
 
     # dual(P.X --> Vy) = (Vx, ~P.Y)
     @property
-    def dual(self):
+    def dual(self) -> Tuple[RelationalVariable, RelationalVariable]:
         new_cause = RelationalVariable(self.cause.rpath.reverse(), self.effect.attr)
         new_effect = RelationalVariable(RelationalPath(self.cause.terminal), self.cause.attr)
         return new_effect, new_cause
@@ -582,7 +582,7 @@ class ParamRCM(RCM):
         self.functions = functions
 
 
-def terminal_set(skeleton: RelationalSkeleton, rpath, base_item: SkItem, semantics='path') -> typing.Set[SkItem]:
+def terminal_set(skeleton: RelationalSkeleton, rpath, base_item: SkItem, semantics='path') -> Set[SkItem]:
     """A terminal set of given relational path from the base item on the given relational skeleton.
 
     Parameters
@@ -771,7 +771,7 @@ class GroundGraph:
     def __str__(self):
         return str(self.g)
 
-    def as_networkx_dag(self):
+    def as_networkx_dag(self) -> nx.DiGraph:
         return self.g.as_networkx_dag().copy()
 
     def adj(self, x, attr_type=None):
@@ -832,7 +832,7 @@ def generate_rpath(schema: RelationalSchema, base: ItemClass = None, length=None
     return RelationalPath(rpath_inner, True)
 
 
-def generate_rcm(schema: RelationalSchema, num_dependencies=10, max_degree=5, max_hop=6):
+def generate_rcm(schema: RelationalSchema, num_dependencies=10, max_degree=5, max_hop=6) -> RCM:
     """Generate a random relational causal model."""
 
     FAILED_LIMIT = len(schema.entities) + len(schema.relationships)
@@ -855,7 +855,7 @@ def generate_rcm(schema: RelationalSchema, num_dependencies=10, max_degree=5, ma
         failed_count = 0
         while len(rcm.pa(effect)) < degree and failed_count < FAILED_LIMIT:
             rpath = generate_rpath(schema, base_class, randint(1, max_hop + 1 + 1))
-            cause_attr_candidates = list(filter(causable, rpath.terminal.attrs - {effect_attr, }))
+            cause_attr_candidates = list(filter(causable, rpath.terminal.attrs - {effect_attr}))
             if not cause_attr_candidates:
                 failed_count += 1
                 continue
@@ -933,7 +933,7 @@ def normalize_skeleton(skeleton: RelationalSkeleton):
             item[crv.attr] = (item[crv.attr] - mu) / std
 
 
-def linear_gaussians_rcm(rcm: RCM, seed=None):
+def linear_gaussians_rcm(rcm: RCM, seed=None) -> ParamRCM:
     """Parameterized RCM as a linear model with Gaussian additive noise."""
     if seed is not None:
         np.random.seed(seed)
@@ -949,7 +949,7 @@ def linear_gaussians_rcm(rcm: RCM, seed=None):
     return ParamRCM(rcm.schema, rcm.directed_dependencies, functions)
 
 
-def __validate_item_class(base_item_class, schema):
+def __validate_item_class(base_item_class: ItemClass, schema: RelationalSchema):
     if not isinstance(base_item_class, ItemClass):
         raise TypeError('{} is not a valid item class.'.format(type(base_item_class)))
     if base_item_class not in schema:
@@ -961,8 +961,8 @@ def __validate_hop(hop):
         raise ValueError('Hop must be a non-negative integer. Received {}'.format(hop))
 
 
-def enumerate_rpaths(schema: RelationalSchema, hop, base_item_class=None):
-    """Returns a generator that enumerates all valid relational paths up to the given hop."""
+def enumerate_rpaths(schema: RelationalSchema, hop: int, base_item_class=None) -> Generator[RelationalPath, None, None]:
+    """Returns a generator that enumerates all valid relational paths up to the given hop starting with the specified base item class, if given."""
     __validate_hop(hop)
     if base_item_class:
         __validate_item_class(base_item_class, schema)
@@ -980,7 +980,7 @@ def enumerate_rpaths(schema: RelationalSchema, hop, base_item_class=None):
             Ps.extend(filter(lambda x: x is not None, (P.appended_or_none(i) for i in schema.relateds(P.terminal))))
 
 
-def enumerate_rvars(schema: RelationalSchema, hop):
+def enumerate_rvars(schema: RelationalSchema, hop: int) -> Generator[RelationalVariable, None, None]:
     """Returns a generator that enumerates all valid relational variables up to the given hop."""
 
     __validate_hop(hop)
@@ -996,7 +996,7 @@ class interner(dict):
         return key
 
 
-def enumerate_rdeps(schema: RelationalSchema, hop):
+def enumerate_rdeps(schema: RelationalSchema, hop) -> Generator[RelationalDependency, None, None]:
     """Returns a generator that enumerates all valid relational dependencies up to the given hop."""
     __validate_hop(hop)
 

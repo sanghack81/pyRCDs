@@ -31,7 +31,7 @@ if __name__ == '__main__':
                     'Accessories': B, 'Devices': B}
     p, r, q, s, t, c, a, l, ta, sm, ac, d = ents = tuple([SkItem(e, entity_types[e]) for e in entity_names])
     skeleton.add_entities(*ents)
-    for emp, prods in ((p, {c, }), (q, {c, a, l}), (s, {l, ta}), (t, {sm, ta}), (r, {l, })):
+    for emp, prods in ((p, {c}), (q, {c, a, l}), (s, {l, ta}), (t, {sm, ta}), (r, {l})):
         for prod in prods:
             skeleton.add_relationship(SkItem(emp.name + '-' + prod.name, D), {emp, prod})
     for biz, prods in ((ac, {c, a}), (d, {l, ta, sm})):

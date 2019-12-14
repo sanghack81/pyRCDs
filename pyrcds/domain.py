@@ -4,7 +4,7 @@ from collections import defaultdict, Counter
 from enum import IntEnum
 from functools import total_ordering
 from itertools import chain
-from typing import Set, FrozenSet
+from typing import Set, FrozenSet, Dict, List
 
 import networkx as nx
 from numpy.random.mtrand import random_sample, choice, randint
@@ -78,9 +78,9 @@ class ItemClass(SchemaElement):
             Attribute classes of the item class
         """
         if isinstance(attrs, AttributeClass):
-            attrs = {attrs, }
+            attrs = {attrs}
         elif isinstance(attrs, str):
-            attrs = {AttributeClass(attrs), }
+            attrs = {AttributeClass(attrs)}
         attrs = {AttributeClass(a) if isinstance(a, str) else a for a in attrs}
         assert all(isinstance(a, AttributeClass) for a in attrs)
         assert name not in _names(attrs)
@@ -108,12 +108,12 @@ class EntityClass(ItemClass):
         attr_part = ', '.join(str(a) for a in sorted(self.attrs)) if self.attrs else ''
         return self.name + "(" + attr_part + ")"
 
-    def to_dict(self):
+    def to_dict(self) -> Dict:
         return {'name': self.name,
                 'attrs': [a.name for a in self.attrs]}
 
     @staticmethod
-    def from_dict(dic):
+    def from_dict(dic) -> 'EntityClass':
         return EntityClass(dic['name'], dic['attrs'])
 
     @property
@@ -268,7 +268,7 @@ class RelationalSchema:
         lines.append("schema = RelationalSchema(entities, relationships)")
         return '\n'.join(lines)
 
-    def relateds(self, item_class: ItemClass) -> frozenset:
+    def relateds(self, item_class: ItemClass) -> FrozenSet[ItemClass]:
         """Neighboring item classes of the given item class"""
         return self.__i2i[item_class]
 
@@ -285,7 +285,7 @@ class RelationalSchema:
                 g.add_edge(self.item_class_of(attr), attr)
         return g
 
-    def to_dict(self):
+    def to_dict(self) -> Dict[str, List]:
         return {'entities': [e.to_dict() for e in self.entities],
                 'relationships': [r.to_dict() for r in self.relationships]}
 

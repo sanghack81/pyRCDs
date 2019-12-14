@@ -79,10 +79,6 @@ def visualize_ground_graph(gg: GroundGraph, filename, title='undirected Ground G
     pal = options.get('pal', sns.color_palette(options.get('palette', "Paired"), len(schema.attrs)))
     sorted_attrs = list(sorted(schema.attrs))
 
-    # for n in list(G.nodes):
-    #     if len(list(G.neighbors(n))) == 0:
-    #         G.remove_node(n)
-
     all_item_attributes = G.nodes()
     factor = options.get('factor', 2 * max(1., np.math.log(1 + len(all_item_attributes) / np.math.log(8))))
 
@@ -153,7 +149,8 @@ def visualize_skeleton(skeleton: RelationalSkeleton, filename, title='relational
     xmin, xmax = plt.xlim()
     ymin, ymax = plt.ylim()
     ax.legend(loc='center left', bbox_to_anchor=(1, 0.5))
-    plt.tick_params(
+
+    plt.tick_params( # https://stackoverflow.com/questions/12998430/remove-xticks-in-a-matplotlib-plot
         axis='both',  # changes apply to the x-axis
         which='both',  # both major and minor ticks are affected
         bottom='off',  # ticks along the bottom edge are off

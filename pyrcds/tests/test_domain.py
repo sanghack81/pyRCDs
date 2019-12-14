@@ -64,9 +64,9 @@ def test_EDPDE():
                    "Funds((), {BizUnit: many, Product: one})" \
                    "])"
 
-    assert schema.relateds(B) == {F, }
+    assert schema.relateds(B) == {F}
     assert schema.relateds(P) == {D, F}
-    assert schema.relateds(E) == {D, }
+    assert schema.relateds(E) == {D}
 
 
 def test_skeleton():

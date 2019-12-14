@@ -1,7 +1,7 @@
 import functools
 import itertools
 import logging
-import typing
+from typing import Generator, Set, List
 from collections import deque, defaultdict, namedtuple
 from itertools import takewhile, count, combinations
 
@@ -57,10 +57,18 @@ class CITestResult:
 class CITester:
     """Abstract class for conditional independence tester"""
 
-    def __init__(self, alpha=0.05):
+    def __init__(self, alpha: float=0.05):
+        """
+
+        Parameters
+        ----------
+        alpha:
+            significance level
+        """
         self.alpha = alpha
 
     def ci_test(self, x: RelationalVariable, y: RelationalVariable, zs=tuple(), **options) -> CITestResult:
+        """ X _||_ Y | Zs """
         raise NotImplementedError()
 
     @property
@@ -79,16 +87,14 @@ def __validate_rpath(Q):
         raise TypeError('RPath is expected. {} is given.'.format(type(Q)))
 
 
-def extend(P: RelationalPath, Q: RelationalPath):
-    """See [1] for the description of extend
+def extend(P: RelationalPath, Q: RelationalPath) -> Generator[RelationalPath, None, None]:
+    """See [1] for the description of extend, Lee and Honavar provides a `new_extend` method
 
     References
     ----------
     [1] Marc Maier, Causal Discovery for Relational Domains: Representation, Reasoning, and Learning
         Ph.D. Dissertation, University of Massachusetts, Amherst
     """
-    # __validate_rpath(P)
-    # __validate_rpath(Q)
     if P.terminal != Q.base:
         raise ValueError('The terminal of {} must be the same as the base of {}'.format(P, Q))
 
@@ -98,7 +104,7 @@ def extend(P: RelationalPath, Q: RelationalPath):
             yield P[:m - 1 - pivot] ** Q[pivot:]
 
 
-def intersectable(P: RelationalPath, Q: RelationalPath):
+def intersectable(P: RelationalPath, Q: RelationalPath) -> bool:
     __validate_rpath(P)
     __validate_rpath(Q)
     if P == Q:
@@ -137,7 +143,12 @@ def intersectable(P: RelationalPath, Q: RelationalPath):
 #     # return co_intersectible(Q, R, P, P_prime, schema)
 
 
-def co_intersectable(Q: RelationalPath, R: RelationalPath, P: RelationalPath, P_prime: RelationalPath, schema: RelationalSchema = None):
+def co_intersectable(Q: RelationalPath, R: RelationalPath, P: RelationalPath, P_prime: RelationalPath, schema: RelationalSchema = None) -> bool:
+    """
+    Whether two intersectable relational paths P and P' can join at the end with a relational path Q and R extended.
+
+    For the details, see Lee and Honavar 2016 (UAI)
+    """
     assert Q.base == P.base == P_prime.base
     assert Q.terminal == R.base
     assert R.terminal == P.terminal == P_prime.terminal
@@ -258,7 +269,7 @@ class UnvisitedQueue:
         return bool(self.queue)
 
 
-def d_separated(dag: nx.DiGraph, x, y, zs=frozenset()):
+def d_separated(dag: nx.DiGraph, x, y, zs=frozenset()) -> bool:
     """A simple implementation of d-separation. """
     assert x != y
     assert x not in zs and y not in zs
@@ -468,8 +479,6 @@ class AbstractRCD:
     """Abstract class for RCD-related causal discovery algorithm"""
 
     def __init__(self, schema, h_max, ci_tester, verbose=False):
-        # self.logger = logging.getLogger(self.__class__.__module__ + '.' + self.__class__.__name__)
-
         self.schema = schema
         self.h_max = h_max
         self.ci_tester = ci_tester
@@ -615,7 +624,7 @@ def sound_rules(g: PDAG, non_colliders=(), purge=True):
             break
 
 
-def completes(g: PDAG, non_colliders: typing.Set):
+def completes(g: PDAG, non_colliders: Set):
     """Maximally orients edges in the given PDAG with non-collider constraints"""
     U = unions({(x, y), (y, x)} for x, y in g.unoriented())
 
@@ -637,7 +646,7 @@ def completes(g: PDAG, non_colliders: typing.Set):
             U -= {(x, y), (y, x)}
 
 
-def ext(g: PDAG, NC: typing.Set) -> bool:
+def ext(g: PDAG, NC: Set) -> bool:
     """Extensibility where non-colliders are completely identified."""
     h = g.copy()
     while h:
@@ -1069,11 +1078,12 @@ def markov_equivalent(model1: RCM, model2: RCM) -> bool:
     return markov_equivalence(model1) == markov_equivalence(model2)
 
 
-def new_extend(P: RelationalPath, Q: RelationalPath):
+def new_extend(P: RelationalPath, Q: RelationalPath) -> List[RelationalPath]:
+    """ """
     return list(set(new_extend_iter2(P, Q)))
 
 
-def new_extend_iter2(P: RelationalPath, Q: RelationalPath):
+def new_extend_iter2(P: RelationalPath, Q: RelationalPath) -> Generator[RelationalPath, None, None]:
     """Relationship after joining P and Q, from the perspective of item class of X except the item class of X itself"""
     LL = llrsp
 
