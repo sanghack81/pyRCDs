@@ -57,7 +57,7 @@ def test_interner():
     xx = interner()
     x = (1, 2, 3)
     y = (1, 2, 3)
-    assert id(x) != id(y)
+    # assert id(x) != id(y), this may not be necessarily true in 3.7
     z1 = xx[x]
     z2 = xx[y]
     assert id(z1) == id(z2) == id(x)
