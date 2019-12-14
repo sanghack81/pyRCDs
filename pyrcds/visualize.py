@@ -150,7 +150,7 @@ def visualize_skeleton(skeleton: RelationalSkeleton, filename, title='relational
     ymin, ymax = plt.ylim()
     ax.legend(loc='center left', bbox_to_anchor=(1, 0.5))
 
-    plt.tick_params( # https://stackoverflow.com/questions/12998430/remove-xticks-in-a-matplotlib-plot
+    plt.tick_params(  # https://stackoverflow.com/questions/12998430/remove-xticks-in-a-matplotlib-plot
         axis='both',  # changes apply to the x-axis
         which='both',  # both major and minor ticks are affected
         bottom='off',  # ticks along the bottom edge are off
