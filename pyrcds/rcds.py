@@ -1064,7 +1064,7 @@ def rbos_colliders_non_colliders(model: RCM):
     return namedtuple('OrientableTestsStats', ['rbos', 'colliders', 'non_colliders'])(frozenset(rbos), frozenset(colliders), frozenset(non_colliders))
 
 
-def markov_equivalent(model1: RCM, model2: RCM):
+def markov_equivalent(model1: RCM, model2: RCM) -> bool:
     """Two RCMs under path semantics are equivalent based on Markov condition."""
     return markov_equivalence(model1) == markov_equivalence(model2)
 

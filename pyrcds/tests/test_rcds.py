@@ -80,7 +80,7 @@ def test_extend():
                 RelationalPath([E])}
     assert actual == expected
     actual = set(extend(RelationalPath([E, D, P, F, B, F, P]), RelationalPath([P, F, B])))
-    expected = {RelationalPath([E, D, P, F, B]), }
+    expected = {RelationalPath([E, D, P, F, B])}
     assert actual == expected
 
 
@@ -326,7 +326,7 @@ def test_co_intersectable_example():
     R = RelationalPath([Ij, R5, Ik, R4, E3, R2, E1, R3, E2, R4, Ik])
     P = RelationalPath([B, R1, E1, R3, E2, R4, Ik])
     P_prime = RelationalPath([B, R1, E1, R2, E3, R4, Ik])
-    schema = RelationalSchema(set(entities), set([R1, R2, R3, R4, R5]))
+    schema = RelationalSchema(set(entities), {R1, R2, R3, R4, R5})
     assert P in set(extend(Q, R))
     assert P in set(new_extend(Q, R))
     assert intersectable(P, P_prime)

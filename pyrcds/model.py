@@ -720,8 +720,10 @@ class SkeletonDataInterface:
         return inner_data
 
     def fetch_singleton(self, rvar: RelationalVariable):
+        """ an array of attribute values ordered based on self.base_items """
         assert rvar.is_canonical
-        return np.array([next(iter(terminal_set(self.skeleton, rvar.rpath, b)))[rvar.attr] for b in self.base_items[rvar.base]])
+        return np.array([next(iter(terminal_set(self.skeleton, rvar.rpath, b)))[rvar.attr]
+                         for b in self.base_items[rvar.base]])
 
 
 ItemAttribute = namedtuple('ItemAttribute', ['item', 'attr'])
@@ -886,6 +888,8 @@ def generate_values_for_skeleton(rcm: ParamRCM, skeleton: RelationalSkeleton, se
         a parameterized RCM, where its functions are used to generate values on skeleton.
     skeleton : RelationalSkeleton
         a skeleton where values will be assigned to its item-attributes
+    seed : int
+        a seed for random number generator
     """
     if seed is not None:
         np.random.seed(seed)
