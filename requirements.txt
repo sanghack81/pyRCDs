@@ -1,8 +1,0 @@
-tqdm
-pytest
-matplotlib
-networkx>=2.1
-numpy
-seaborn
-joblib
-pygraphviz

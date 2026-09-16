@@ -1,16 +1,46 @@
-from typing import Union, List
-
 import numpy as np
 import pytest
 from joblib import Parallel, delayed
 from networkx import is_directed_acyclic_graph
 from tqdm import trange
 
-from pyrcds.domain import AttributeClass, RelationalSkeleton, SkItem, generate_schema, generate_skeleton, EntityClass, RelationshipClass, Cardinality, RelationalSchema
-from pyrcds.model import RelationalPath, llrsp, RelationalVariable, terminal_set, PRCM, UndirectedRDep, RCM, GroundGraph, generate_rcm, \
-    canonical_rvars, linear_gaussians_rcm, generate_values_for_skeleton, flatten, generate_rpath, is_valid_rpath, RelationalDependency
+from pyrcds.domain import (
+    AttributeClass,
+    RelationalSkeleton,
+    SkItem,
+    generate_schema,
+    generate_skeleton,
+    EntityClass,
+    RelationshipClass,
+    Cardinality,
+    RelationalSchema,
+)
+from pyrcds.model import (
+    RelationalPath,
+    llrsp,
+    RelationalVariable,
+    terminal_set,
+    PRCM,
+    UndirectedRDep,
+    RCM,
+    GroundGraph,
+    generate_rcm,
+    canonical_rvars,
+    linear_gaussians_rcm,
+    generate_values_for_skeleton,
+    flatten,
+    generate_rpath,
+    is_valid_rpath,
+    RelationalDependency,
+)
 from pyrcds.rcds import intersectable
-from pyrcds.tests.testing_utils import EPBDF, company_schema, company_rcm, company_skeleton, company_deps
+from pyrcds.tests.testing_utils import (
+    EPBDF,
+    company_schema,
+    company_rcm,
+    company_skeleton,
+    company_deps,
+)
 from pyrcds.utils import between_sampler
 
 
@@ -64,7 +94,9 @@ def test_rpath_4():
     RelationalPath([E, D, P, F, B, F, P, D])
     RelationalPath([E, D, P, F, B, F, P, D, E])
     assert RelationalPath([E, D, P, F, B, F, P, D, E]).joinable(RelationalPath([E, D, P]))
-    assert RelationalPath([E, D, P, F, B, F, P, D, E]).join(RelationalPath([E, D, P])) == RelationalPath([E, D, P, F, B, F, P, D, E, D, P])
+    assert RelationalPath([E, D, P, F, B, F, P, D, E]).join(
+        RelationalPath([E, D, P])
+    ) == RelationalPath([E, D, P, F, B, F, P, D, E, D, P])
     assert RelationalPath([E, D, P, F, B, F, P, D, E]).joinable(RelationalPath(E))
     assert RelationalPath(E).joinable(RelationalPath(E))
     assert not RelationalPath(E).joinable(RelationalPath(D))
@@ -77,10 +109,14 @@ def test_rpath_4():
     assert not RelationalPath([D, P]).is_canonical
     RelationalPath([D, P, D])
     RelationalPath([D, P, D, E])
-    assert E == RelationalPath([D, P, D, E]).terminal
-    assert D == RelationalPath([D, P, D, E]).base
-    assert P == RelationalPath([D, P, D, E])[1]
-    assert RelationalPath([D, P, D, E]).reverse() == RelationalPath(list(reversed([D, P, D, E]))) == RelationalPath([E, D, P, D])
+    assert RelationalPath([D, P, D, E]).terminal == E
+    assert RelationalPath([D, P, D, E]).base == D
+    assert RelationalPath([D, P, D, E])[1] == P
+    assert (
+        RelationalPath([D, P, D, E]).reverse()
+        == RelationalPath(list(reversed([D, P, D, E])))
+        == RelationalPath([E, D, P, D])
+    )
     RelationalPath([D, P, F, B])
     RelationalPath([D, P, F, B, F])
     RelationalPath([D, P, F, B, F, P])
@@ -89,63 +125,129 @@ def test_rpath_4():
     RelationalPath([D, P, F, B, F, P, D])
     RelationalPath([D, P, F, B, F, P, D, E])
     assert not RelationalPath([D, P, F, B, F, P, D, E]).is_canonical
-    assert RelationalPath(D) == RelationalPath([D, ])
-    assert len({RelationalPath([D, P, F, B, F, P, D, E]), RelationalPath([D, P, F, B, F, P, D]), RelationalPath([D, P, F, B, F, P]),
-                RelationalPath([D, P, F, B, F, P])}) == 3
-    assert all(i == j for i, j in zip(RelationalPath([D, P, F, B, F, P, D, E]), [D, P, F, B, F, P, D, E]))
+    assert RelationalPath(D) == RelationalPath(
+        [
+            D,
+        ]
+    )
+    assert (
+        len(
+            {
+                RelationalPath([D, P, F, B, F, P, D, E]),
+                RelationalPath([D, P, F, B, F, P, D]),
+                RelationalPath([D, P, F, B, F, P]),
+                RelationalPath([D, P, F, B, F, P]),
+            }
+        )
+        == 3
+    )
+    assert all(
+        i == j for i, j in zip(RelationalPath([D, P, F, B, F, P, D, E]), [D, P, F, B, F, P, D, E])
+    )
     assert llrsp(RelationalPath([P, F, B]), RelationalPath([P, F, B])) == 3
     assert llrsp(RelationalPath([E, D, P, F, B]), RelationalPath([E, D, P, D, E])) == 1
     assert llrsp(RelationalPath([P, F, B, F, P]), RelationalPath([P, F, B, F, P])) == 3
     assert intersectable(RelationalPath([P, F, B, F, P]), RelationalPath([P, F, B, F, P]))
-    assert intersectable(RelationalPath([E, D, P, D, E]), RelationalPath([E, D, P, D, E, D, P, D, E]))
-    assert intersectable(RelationalPath([E, D, P, D, E]), RelationalPath([E, D, P, D, E, D, P, D, E]))
-    assert RelationalVariable(RelationalPath([E, D, P, D, E]), AttributeClass('Salary')) == RelationalVariable(RelationalPath([E, D, P, D, E]), AttributeClass('Salary'))
-    assert not RelationalVariable(RelationalPath([E, D, P, D, E]), AttributeClass('Salary')).is_canonical
-    assert RelationalVariable(RelationalPath(E), AttributeClass('Salary')).is_canonical
-    assert len(RelationalVariable(RelationalPath(E), AttributeClass('Salary'))) == 1
-    assert len(RelationalVariable(RelationalPath([E, D, P, D, E]), AttributeClass('Salary'))) == 5
-    assert len(
-        {RelationalVariable(RelationalPath([E, D, P, D, E]), AttributeClass('Salary')), RelationalVariable(RelationalPath([E, D, P, D, E]), AttributeClass('Salary'))}) == 1
+    assert intersectable(
+        RelationalPath([E, D, P, D, E]), RelationalPath([E, D, P, D, E, D, P, D, E])
+    )
+    assert intersectable(
+        RelationalPath([E, D, P, D, E]), RelationalPath([E, D, P, D, E, D, P, D, E])
+    )
+    assert RelationalVariable(
+        RelationalPath([E, D, P, D, E]), AttributeClass("Salary")
+    ) == RelationalVariable(RelationalPath([E, D, P, D, E]), AttributeClass("Salary"))
+    assert not RelationalVariable(
+        RelationalPath([E, D, P, D, E]), AttributeClass("Salary")
+    ).is_canonical
+    assert RelationalVariable(RelationalPath(E), AttributeClass("Salary")).is_canonical
+    assert len(RelationalVariable(RelationalPath(E), AttributeClass("Salary"))) == 1
+    assert len(RelationalVariable(RelationalPath([E, D, P, D, E]), AttributeClass("Salary"))) == 5
+    assert (
+        len(
+            {
+                RelationalVariable(RelationalPath([E, D, P, D, E]), AttributeClass("Salary")),
+                RelationalVariable(RelationalPath([E, D, P, D, E]), AttributeClass("Salary")),
+            }
+        )
+        == 1
+    )
 
 
 def test_skeleton():
     E, P, B, D, F = EPBDF()
-    entities = ['Paul', 'Roger', 'Quinn', 'Sally', 'Thomas',
-                'Case', 'Adapter', 'Laptop', 'Tablet', 'Smartphone',
-                'Accessories', 'Devices']
+    entities = [
+        "Paul",
+        "Roger",
+        "Quinn",
+        "Sally",
+        "Thomas",
+        "Case",
+        "Adapter",
+        "Laptop",
+        "Tablet",
+        "Smartphone",
+        "Accessories",
+        "Devices",
+    ]
 
-    entity_types = {'Paul': E, 'Roger': E, 'Quinn': E, 'Sally': E, 'Thomas': E,
-                    'Case': P, 'Adapter': P, 'Laptop': P, 'Tablet': P, 'Smartphone': P,
-                    'Accessories': B, 'Devices': B}
+    entity_types = {
+        "Paul": E,
+        "Roger": E,
+        "Quinn": E,
+        "Sally": E,
+        "Thomas": E,
+        "Case": P,
+        "Adapter": P,
+        "Laptop": P,
+        "Tablet": P,
+        "Smartphone": P,
+        "Accessories": B,
+        "Devices": B,
+    }
     skeleton = RelationalSkeleton(company_schema(), True)
-    p, r, q, s, t, c, a, l, ta, sm, ac, d = ents = tuple([SkItem(e, entity_types[e]) for e in entities])
+    p, r, q, s, t, c, a, l, ta, sm, ac, d = ents = tuple(
+        [SkItem(e, entity_types[e]) for e in entities]
+    )
     skeleton.add_entities(*ents)
     for emp, prods in ((p, {c}), (q, {c, a, l}), (s, {l, ta}), (t, {sm, ta}), (r, {l})):
         for prod in prods:
-            skeleton.add_relationship(SkItem(emp.name + '-' + prod.name, D), {emp, prod})
+            skeleton.add_relationship(SkItem(emp.name + "-" + prod.name, D), {emp, prod})
     for biz, prods in ((ac, {c, a}), (d, {l, ta, sm})):
         for prod in prods:
-            skeleton.add_relationship(SkItem(biz.name + '-' + prod.name, F), {biz, prod})
+            skeleton.add_relationship(SkItem(biz.name + "-" + prod.name, F), {biz, prod})
 
     assert terminal_set(skeleton, RelationalPath([E, D, P, F, B]), p) == {ac}
     assert terminal_set(skeleton, RelationalPath([E, D, P, F, B]), q) == {ac, d}
     assert terminal_set(skeleton, RelationalPath([E, D, P, D, E]), r) == {q, s}
     assert terminal_set(skeleton, RelationalPath([E, D, P, D, E, D, P]), r) == {c, a, ta}
 
-    assert terminal_set(skeleton, RelationalPath([E, D, P, F, B]), p, 'bridge-burning') == {ac}
-    assert terminal_set(skeleton, RelationalPath([E, D, P, F, B]), q, 'bridge-burning') == {ac, d}
-    assert terminal_set(skeleton, RelationalPath([E, D, P, D, E]), r, 'bridge-burning') == {q, s}
-    assert terminal_set(skeleton, RelationalPath([E, D, P, D, E, D, P]), r, 'bridge-burning') == {c, a, ta}
+    assert terminal_set(skeleton, RelationalPath([E, D, P, F, B]), p, "bridge-burning") == {ac}
+    assert terminal_set(skeleton, RelationalPath([E, D, P, F, B]), q, "bridge-burning") == {ac, d}
+    assert terminal_set(skeleton, RelationalPath([E, D, P, D, E]), r, "bridge-burning") == {q, s}
+    assert terminal_set(skeleton, RelationalPath([E, D, P, D, E, D, P]), r, "bridge-burning") == {
+        c,
+        a,
+        ta,
+    }
 
     assert terminal_set(skeleton, RelationalPath([E, D, P, D, E]), q) == {p, r, s}
-    assert terminal_set(skeleton, RelationalPath([E, D, P, D, E]), q, 'bridge-burning') == {p, r, s}
+    assert terminal_set(skeleton, RelationalPath([E, D, P, D, E]), q, "bridge-burning") == {p, r, s}
     assert terminal_set(skeleton, RelationalPath([E, D, P, D, E, D, P, D, E]), q) == {t}
-    assert terminal_set(skeleton, RelationalPath([E, D, P, D, E, D, P, D, E]), q, 'bridge-burning') == {t}
+    assert terminal_set(
+        skeleton, RelationalPath([E, D, P, D, E, D, P, D, E]), q, "bridge-burning"
+    ) == {t}
 
     assert terminal_set(skeleton, RelationalPath([P, D, E, D, P]), l) == {c, a, ta}
-    assert terminal_set(skeleton, RelationalPath([P, D, E, D, P]), l, 'bridge-burning') == {c, a, ta}
+    assert terminal_set(skeleton, RelationalPath([P, D, E, D, P]), l, "bridge-burning") == {
+        c,
+        a,
+        ta,
+    }
     assert terminal_set(skeleton, RelationalPath([P, D, E, D, P, F, B, F, P]), l) == {sm, c, a}
-    assert terminal_set(skeleton, RelationalPath([P, D, E, D, P, F, B, F, P]), l, 'bridge-burning') == {sm}
+    assert terminal_set(
+        skeleton, RelationalPath([P, D, E, D, P, F, B, F, P]), l, "bridge-burning"
+    ) == {sm}
 
 
 def test_sub():
@@ -183,17 +285,26 @@ def test_rcm():
     urcm = PRCM(company_schema(), {UndirectedRDep(d) for d in deps})
     assert urcm.max_hop == 4
     ucdg = urcm.class_dependency_graph
-    assert not ucdg.pa(AttributeClass('Salary'))
-    assert not ucdg.ch(AttributeClass('Salary'))
-    assert ucdg.ne(AttributeClass('Salary')) == {AttributeClass('Budget'), AttributeClass('Competence')}
-    assert ucdg.adj(AttributeClass('Salary')) == {AttributeClass('Budget'), AttributeClass('Competence')}
+    assert not ucdg.pa(AttributeClass("Salary"))
+    assert not ucdg.ch(AttributeClass("Salary"))
+    assert ucdg.ne(AttributeClass("Salary")) == {
+        AttributeClass("Budget"),
+        AttributeClass("Competence"),
+    }
+    assert ucdg.adj(AttributeClass("Salary")) == {
+        AttributeClass("Budget"),
+        AttributeClass("Competence"),
+    }
     for d in deps:
         urcm.orient_as(d)
     cdg = urcm.class_dependency_graph
-    assert cdg.adj(AttributeClass('Revenue')) == {AttributeClass('Success'), AttributeClass('Budget')}
-    assert cdg.ne(AttributeClass('Revenue')) == set()
-    assert cdg.pa(AttributeClass('Revenue')) == {AttributeClass('Success')}
-    assert cdg.ch(AttributeClass('Revenue')) == {AttributeClass('Budget')}
+    assert cdg.adj(AttributeClass("Revenue")) == {
+        AttributeClass("Success"),
+        AttributeClass("Budget"),
+    }
+    assert cdg.ne(AttributeClass("Revenue")) == set()
+    assert cdg.pa(AttributeClass("Revenue")) == {AttributeClass("Success")}
+    assert cdg.ch(AttributeClass("Revenue")) == {AttributeClass("Budget")}
 
     rcm = RCM(company_schema(), [])
     assert rcm.max_hop == -1
@@ -202,8 +313,13 @@ def test_rcm():
 def test_crv():
     rvars = canonical_rvars(company_schema())
     E, P, B, D, F = EPBDF()
-    assert rvars == {RelationalVariable(RelationalPath(E), 'Competence'), RelationalVariable(RelationalPath(E), 'Salary'), RelationalVariable(RelationalPath(B), 'Revenue'),
-                     RelationalVariable(RelationalPath(B), 'Budget'), RelationalVariable(RelationalPath(P), 'Success')}
+    assert rvars == {
+        RelationalVariable(RelationalPath(E), "Competence"),
+        RelationalVariable(RelationalPath(E), "Salary"),
+        RelationalVariable(RelationalPath(B), "Revenue"),
+        RelationalVariable(RelationalPath(B), "Budget"),
+        RelationalVariable(RelationalPath(P), "Success"),
+    }
 
 
 def test_rcm_orient_0():
@@ -239,20 +355,41 @@ def test_rcm_orient_3():
 
 def test_to_code():
     print(company_rcm().to_code())
-    BizUnit = EntityClass('BizUnit', (AttributeClass('Budget'), AttributeClass('Revenue')))
-    Employee = EntityClass('Employee', (AttributeClass('Competence'), AttributeClass('Salary')))
-    Product = EntityClass('Product', (AttributeClass('Success'),))
-    Develops = RelationshipClass('Develops', (), {Employee: Cardinality.many, Product: Cardinality.many})
-    Funds = RelationshipClass('Funds', (), {Product: Cardinality.one, BizUnit: Cardinality.many})
+    BizUnit = EntityClass("BizUnit", (AttributeClass("Budget"), AttributeClass("Revenue")))
+    Employee = EntityClass("Employee", (AttributeClass("Competence"), AttributeClass("Salary")))
+    Product = EntityClass("Product", (AttributeClass("Success"),))
+    Develops = RelationshipClass(
+        "Develops", (), {Employee: Cardinality.many, Product: Cardinality.many}
+    )
+    Funds = RelationshipClass("Funds", (), {Product: Cardinality.one, BizUnit: Cardinality.many})
     entities = {BizUnit, Employee, Product}
     relationships = {Develops, Funds}
     schema = RelationalSchema(entities, relationships)
 
-    rcm = RCM(schema, {RelationalDependency(RelationalVariable([Employee, Develops, Product, Funds, BizUnit], 'Budget'), RelationalVariable([Employee], 'Salary')),
-                       RelationalDependency(RelationalVariable([Product, Develops, Employee], 'Competence'), RelationalVariable([Product], 'Success')),
-                       RelationalDependency(RelationalVariable([Employee], 'Competence'), RelationalVariable([Employee], 'Salary')),
-                       RelationalDependency(RelationalVariable([BizUnit, Funds, Product], 'Success'), RelationalVariable([BizUnit], 'Revenue')),
-                       RelationalDependency(RelationalVariable([BizUnit], 'Revenue'), RelationalVariable([BizUnit], 'Budget'))})
+    rcm = RCM(
+        schema,
+        {
+            RelationalDependency(
+                RelationalVariable([Employee, Develops, Product, Funds, BizUnit], "Budget"),
+                RelationalVariable([Employee], "Salary"),
+            ),
+            RelationalDependency(
+                RelationalVariable([Product, Develops, Employee], "Competence"),
+                RelationalVariable([Product], "Success"),
+            ),
+            RelationalDependency(
+                RelationalVariable([Employee], "Competence"),
+                RelationalVariable([Employee], "Salary"),
+            ),
+            RelationalDependency(
+                RelationalVariable([BizUnit, Funds, Product], "Success"),
+                RelationalVariable([BizUnit], "Revenue"),
+            ),
+            RelationalDependency(
+                RelationalVariable([BizUnit], "Revenue"), RelationalVariable([BizUnit], "Budget")
+            ),
+        },
+    )
 
     assert rcm.directed_dependencies == company_rcm().directed_dependencies
 
@@ -283,7 +420,7 @@ def test_generate_rpaths():
             assert is_valid_rpath([i for i in rpath])
 
 
-def random_seeds(n=None) -> Union[int, List[int]]:
+def random_seeds(n=None) -> int | list[int]:
     """Random seeds of given size or a random seed if n is None"""
     if n is None:
         return np.random.randint(np.iinfo(np.int32).max)
@@ -316,4 +453,5 @@ def _test_gen_inner(seed):
     assert np.all((np.equal(data_frame1[:, 1], data_frame2[:, 0])).ravel())
     assert np.all((np.equal(data_frame0[:, 0], data_frame3[:, 1])).ravel())
     assert sorted(sorted(val for item, val in ivs) for ivs in data_frame0[:, 0]) == sorted(
-        sorted(v) for v in data_frame1[:, 1])
+        sorted(v) for v in data_frame1[:, 1]
+    )

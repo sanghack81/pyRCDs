@@ -2,13 +2,42 @@ from itertools import combinations
 
 import numpy as np
 
-from pyrcds.domain import generate_schema, RelationalSchema, Cardinality, RelationshipClass, EntityClass
+from pyrcds.domain import (
+    generate_schema,
+    RelationalSchema,
+    Cardinality,
+    RelationshipClass,
+    EntityClass,
+)
 from pyrcds.graphs import PDAG
-from pyrcds.model import generate_rcm, RelationalPath, RelationalVariable, SymTriple, UndirectedRDep, is_valid_rpath, enumerate_rpaths, \
-    enumerate_rdeps, enumerate_rvars
-from pyrcds.rcds import interner, extend, UnvisitedQueue, AbstractGroundGraph, sound_rules, completes, \
-    d_separated, \
-    RpCD, markov_equivalence, CITester, CITestResult, new_extend, intersectable, co_intersectable, CIQuery
+from pyrcds.model import (
+    generate_rcm,
+    RelationalPath,
+    RelationalVariable,
+    SymTriple,
+    UndirectedRDep,
+    is_valid_rpath,
+    enumerate_rpaths,
+    enumerate_rdeps,
+    enumerate_rvars,
+)
+from pyrcds.rcds import (
+    interner,
+    extend,
+    UnvisitedQueue,
+    AbstractGroundGraph,
+    sound_rules,
+    completes,
+    d_separated,
+    RpCD,
+    markov_equivalence,
+    CITester,
+    CITestResult,
+    new_extend,
+    intersectable,
+    co_intersectable,
+    CIQuery,
+)
 from pyrcds.tests.testing_utils import company_rcm, company_schema, EPBDF
 
 
@@ -22,15 +51,17 @@ def test_something():
         assert is_valid_rpath(list(rpath))
 
     assert rcm.directed_dependencies <= set(enumerate_rdeps(schema, rcm.max_hop))
-    assert 22 == len(set(enumerate_rdeps(schema, 4)))
-    assert 162 == len(set(enumerate_rdeps(schema, 16)))
-    assert 22 == len(set(enumerate_rdeps(schema, 4)))
-    assert 162 == len(set(enumerate_rdeps(schema, 16)))
+    assert len(set(enumerate_rdeps(schema, 4))) == 22
+    assert len(set(enumerate_rdeps(schema, 16))) == 162
+    assert len(set(enumerate_rdeps(schema, 4))) == 22
+    assert len(set(enumerate_rdeps(schema, 16))) == 162
 
 
 def test_enumerate_rpaths():
     M = company_rcm()
-    assert {d.cause.rpath for d in M.directed_dependencies} <= set(enumerate_rpaths(M.schema, M.max_hop))
+    assert {d.cause.rpath for d in M.directed_dependencies} <= set(
+        enumerate_rpaths(M.schema, M.max_hop)
+    )
 
     schema = company_schema()
     assert len(set(enumerate_rpaths(schema, 0))) == len(schema.item_classes)
@@ -49,8 +80,7 @@ def test_enumerate_rvars():
         l = list(enumerate_rvars(schema, i))
         s = set(l)
         assert len(s) == len(l)
-        assert len(l) == sum(
-            len(p.terminal.attrs) for p in enumerate_rpaths(schema, i))
+        assert len(l) == sum(len(p.terminal.attrs) for p in enumerate_rpaths(schema, i))
 
 
 def test_interner():
@@ -75,9 +105,11 @@ def test_enumerate_rdeps():
 def test_extend():
     E, P, B, D, F = EPBDF()
     actual = set(extend(RelationalPath([E, D, P, F, B]), RelationalPath([B, F, P, D, E])))
-    expected = {RelationalPath([E, D, P, F, B, F, P, D, E]),
-                RelationalPath([E, D, P, D, E]),
-                RelationalPath([E])}
+    expected = {
+        RelationalPath([E, D, P, F, B, F, P, D, E]),
+        RelationalPath([E, D, P, D, E]),
+        RelationalPath([E]),
+    }
     assert actual == expected
     actual = set(extend(RelationalPath([E, D, P, F, B, F, P]), RelationalPath([P, F, B])))
     expected = {RelationalPath([E, D, P, F, B])}
@@ -87,7 +119,9 @@ def test_extend():
 def test_intersectible():
     E, P, B, D, F = EPBDF()
 
-    assert intersectable(RelationalPath([E, D, P, F, B, F, P, D, E]), RelationalPath([E, D, P, D, E]))
+    assert intersectable(
+        RelationalPath([E, D, P, F, B, F, P, D, E]), RelationalPath([E, D, P, D, E])
+    )
     assert not intersectable(RelationalPath([E, D, P, F, B, F, P]), RelationalPath([E, D, P, D, E]))
     assert not intersectable(RelationalPath([D, P, F, B, F, P]), RelationalPath([E, D, P, D, E]))
     assert not intersectable(RelationalPath([E]), RelationalPath([E, D, P, D, E]))
@@ -147,29 +181,33 @@ def test_company_fig_4_4_maier():
     agg2h = AbstractGroundGraph(rcm, 2 * rcm.max_hop)
     # Fig 4.4 in Maier's Thesis
     E, P, B, D, F = EPBDF()
-    rvs = [RelationalVariable([E, D, P, F, B, F, P], "Success"),
-           RelationalVariable(E, "Competence"),
-           RelationalVariable([E, D, P], "Success"),
-           RelationalVariable([E, D, P, F, B], "Revenue"),
-           RelationalVariable([E, D, P, D, E], "Competence"),
-           RelationalVariable([E, D, P, D, E, D, P], "Success")]
+    rvs = [
+        RelationalVariable([E, D, P, F, B, F, P], "Success"),
+        RelationalVariable(E, "Competence"),
+        RelationalVariable([E, D, P], "Success"),
+        RelationalVariable([E, D, P, F, B], "Revenue"),
+        RelationalVariable([E, D, P, D, E], "Competence"),
+        RelationalVariable([E, D, P, D, E, D, P], "Success"),
+    ]
 
     iv = frozenset((rvs[-1], rvs[0]))
     vs = set(rvs) | {iv}
     sub = agg2h.agg.subgraph(list(vs))
     # assert len(sub.edges()) == 7
     assert len(sub.edges()) == 10  # new agg now has 10 not 7
-    assert {(rvs[0], rvs[3]),
-            (rvs[1], rvs[2]),
-            (rvs[2], rvs[3]),
-            (rvs[4], rvs[2]),
-            (rvs[4], iv),
-            (rvs[4], rvs[5]),
-            (iv, rvs[3]),
-            # newly added three edges, due to path semantics
-            (rvs[1], rvs[0]),
-            (rvs[1], iv),
-            (rvs[1], rvs[5])} == set(sub.edges())
+    assert {
+        (rvs[0], rvs[3]),
+        (rvs[1], rvs[2]),
+        (rvs[2], rvs[3]),
+        (rvs[4], rvs[2]),
+        (rvs[4], iv),
+        (rvs[4], rvs[5]),
+        (iv, rvs[3]),
+        # newly added three edges, due to path semantics
+        (rvs[1], rvs[0]),
+        (rvs[1], iv),
+        (rvs[1], rvs[5]),
+    } == set(sub.edges())
 
 
 def test_sound_rules():
@@ -241,7 +279,9 @@ def test_company():
     agg = AbstractGroundGraph(rcm, rcm.max_hop * 2)
     rpcd = RpCD(rcm.schema, rcm.max_hop, agg)
     rpcd.phase_I()
-    assert rpcd.prcm.undirected_dependencies == {UndirectedRDep(d) for d in rcm.directed_dependencies}
+    assert rpcd.prcm.undirected_dependencies == {
+        UndirectedRDep(d) for d in rcm.directed_dependencies
+    }
     rpcd.phase_II()
     assert rpcd.prcm.directed_dependencies == rcm.directed_dependencies
 
@@ -257,10 +297,12 @@ def test_company_fixer():
     rcm = company_rcm()
 
     class DumbCITester(CITester):
-        def ci_test_data(self, x, y, zs, attrs, base_items, query_name='') -> CITestResult:
+        def ci_test_data(self, x, y, zs, attrs, base_items, query_name="") -> CITestResult:
             raise NotImplementedError()
 
-        def ci_test(self, x: RelationalVariable, y: RelationalVariable, zs=tuple(), **options) -> CITestResult:
+        def ci_test(
+            self, x: RelationalVariable, y: RelationalVariable, zs=tuple(), **options
+        ) -> CITestResult:
             query = CIQuery(x, y, zs)
             return CITestResult(query, np.random.randint(10) == 0)
 
@@ -271,7 +313,9 @@ def test_company_fixer():
     rpcd = RpCD(rcm.schema, rcm.max_hop, DumbCITester(), verbose=True)
     rpcd.phase_I(rcm)
     print(rpcd.prcm.undirected_dependencies)
-    assert rpcd.prcm.undirected_dependencies == {UndirectedRDep(d) for d in rcm.directed_dependencies}
+    assert rpcd.prcm.undirected_dependencies == {
+        UndirectedRDep(d) for d in rcm.directed_dependencies
+    }
 
 
 def test_rpcd_markov_equivalence():
@@ -292,13 +336,13 @@ def test_rpcd_markov_equivalence():
 
 def test_extend_example():
     print()
-    E1 = EntityClass('E1')
-    E2 = EntityClass('E2')
-    E3 = EntityClass('E3')
-    E4 = EntityClass('E4')
-    Ra = RelationshipClass('Ra', set(), {E1: Cardinality.many, E2: Cardinality.many})
-    Rb = RelationshipClass('Rb', set(), {E2: Cardinality.many, E3: Cardinality.many})
-    Rc = RelationshipClass('Rc', set(), {E2: Cardinality.many, E4: Cardinality.many})
+    E1 = EntityClass("E1")
+    E2 = EntityClass("E2")
+    E3 = EntityClass("E3")
+    E4 = EntityClass("E4")
+    Ra = RelationshipClass("Ra", set(), {E1: Cardinality.many, E2: Cardinality.many})
+    Rb = RelationshipClass("Rb", set(), {E2: Cardinality.many, E3: Cardinality.many})
+    Rc = RelationshipClass("Rc", set(), {E2: Cardinality.many, E4: Cardinality.many})
 
     P = RelationalPath([E1, Ra, E2, Rb, E3])
     Q = RelationalPath([E3, Rb, E2, Rc, E4])
@@ -307,7 +351,7 @@ def test_extend_example():
     assert {extend1, extend3} == set(extend(P, Q))
 
     print()
-    Rb = RelationshipClass('Rb', set(), {E2: Cardinality.many, E3: Cardinality.one})
+    Rb = RelationshipClass("Rb", set(), {E2: Cardinality.many, E3: Cardinality.one})
     P = RelationalPath([E1, Ra, E2, Rb, E3])
     Q = RelationalPath([E3, Rb, E2, Rc, E4])
     assert {extend3} == set(extend(P, Q))
@@ -315,12 +359,16 @@ def test_extend_example():
 
 def test_co_intersectable_example():
     print()
-    Ij, Ik, B, E1, E2, E3 = entities = [EntityClass(name) for name in ['Ij', 'Ik', 'B', 'E1', 'E2', 'E3']]
-    R1 = RelationshipClass('R1', set(), {B: Cardinality.one, E1: Cardinality.one})
-    R2 = RelationshipClass('R2', set(), {E1: Cardinality.one, E3: Cardinality.one})
-    R3 = RelationshipClass('R3', set(), {E1: Cardinality.one, E2: Cardinality.one})
-    R4 = RelationshipClass('R4', set(), {E2: Cardinality.one, E3: Cardinality.one, Ik: Cardinality.one})
-    R5 = RelationshipClass('R5', set(), {Ik: Cardinality.one, Ij: Cardinality.one})
+    Ij, Ik, B, E1, E2, E3 = entities = [
+        EntityClass(name) for name in ["Ij", "Ik", "B", "E1", "E2", "E3"]
+    ]
+    R1 = RelationshipClass("R1", set(), {B: Cardinality.one, E1: Cardinality.one})
+    R2 = RelationshipClass("R2", set(), {E1: Cardinality.one, E3: Cardinality.one})
+    R3 = RelationshipClass("R3", set(), {E1: Cardinality.one, E2: Cardinality.one})
+    R4 = RelationshipClass(
+        "R4", set(), {E2: Cardinality.one, E3: Cardinality.one, Ik: Cardinality.one}
+    )
+    R5 = RelationshipClass("R5", set(), {Ik: Cardinality.one, Ij: Cardinality.one})
 
     Q = RelationalPath([B, R1, E1, R2, E3, R4, Ik, R5, Ij])
     R = RelationalPath([Ij, R5, Ik, R4, E3, R2, E1, R3, E2, R4, Ik])

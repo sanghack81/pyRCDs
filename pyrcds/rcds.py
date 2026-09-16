@@ -1,16 +1,27 @@
 import functools
 import itertools
 import logging
-from typing import Generator, Set, List
+from abc import ABC, abstractmethod
+from collections.abc import Generator
 from collections import deque, defaultdict, namedtuple
 from itertools import takewhile, count, combinations
 
 import networkx as nx
 
-from pyrcds.domain import RelationalSkeleton, RelationalSchema, SkItem, ItemClass
+from pyrcds.domain import RelationalSkeleton, RelationalSchema, SkItem
 from pyrcds.graphs import PDAG
-from pyrcds.model import RelationalDependency, PRCM, llrsp, RelationalVariable, RelationalPath, RCM, UndirectedRDep, SymTriple, enumerate_rvars, \
-    enumerate_rdeps
+from pyrcds.model import (
+    RelationalDependency,
+    PRCM,
+    llrsp,
+    RelationalVariable,
+    RelationalPath,
+    RCM,
+    UndirectedRDep,
+    SymTriple,
+    enumerate_rvars,
+    enumerate_rdeps,
+)
 from pyrcds.utils import group_by, unions, safe_iter
 
 
@@ -29,7 +40,7 @@ class CIQuery:
 
     def __str__(self):
         x, y = sorted(self.pair)
-        zs = ', '.join([str(z) for z in sorted(self.conds)])
+        zs = ", ".join([str(z) for z in sorted(self.conds)])
         return str(x) + " _||_ " + str(y) + " | {" + zs + "}"
 
 
@@ -49,15 +60,17 @@ class CITestResult:
 
     def __str__(self):
         if self.p is not None:
-            return "{}: {} with p={:.4f}".format(self.query, "independent" if self.ci else "dependent", self.p)
+            return "{}: {} with p={:.4f}".format(
+                self.query, "independent" if self.ci else "dependent", self.p
+            )
         else:
             return "{}: {}".format(self.query, "independent" if self.ci else "dependent")
 
 
-class CITester:
+class CITester(ABC):
     """Abstract class for conditional independence tester"""
 
-    def __init__(self, alpha: float=0.05):
+    def __init__(self, alpha: float = 0.05):
         """
 
         Parameters
@@ -67,13 +80,16 @@ class CITester:
         """
         self.alpha = alpha
 
-    def ci_test(self, x: RelationalVariable, y: RelationalVariable, zs=tuple(), **options) -> CITestResult:
-        """ X _||_ Y | Zs """
-        raise NotImplementedError()
+    @abstractmethod
+    def ci_test(
+        self, x: RelationalVariable, y: RelationalVariable, zs=tuple(), **options
+    ) -> CITestResult:
+        """X _||_ Y | Zs"""
+        ...
 
     @property
-    def is_p_value_available(self):
-        raise NotImplementedError()
+    @abstractmethod
+    def is_p_value_available(self) -> bool: ...
 
 
 class interner(dict):
@@ -84,7 +100,7 @@ class interner(dict):
 
 def __validate_rpath(Q):
     if not isinstance(Q, RelationalPath):
-        raise TypeError('RPath is expected. {} is given.'.format(type(Q)))
+        raise TypeError(f"RPath is expected. {type(Q)} is given.")
 
 
 def extend(P: RelationalPath, Q: RelationalPath) -> Generator[RelationalPath, None, None]:
@@ -96,12 +112,12 @@ def extend(P: RelationalPath, Q: RelationalPath) -> Generator[RelationalPath, No
         Ph.D. Dissertation, University of Massachusetts, Amherst
     """
     if P.terminal != Q.base:
-        raise ValueError('The terminal of {} must be the same as the base of {}'.format(P, Q))
+        raise ValueError(f"The terminal of {P} must be the same as the base of {Q}")
 
     m, n = len(P), len(Q)
     for pivot in takewhile(lambda piv: P[m - 1 - piv] == Q[piv], range(min(m, n))):
-        if P[:m - 1 - pivot].joinable(Q[pivot:]):  # double?
-            yield P[:m - 1 - pivot] ** Q[pivot:]
+        if P[: m - 1 - pivot].joinable(Q[pivot:]):  # double?
+            yield P[: m - 1 - pivot] ** Q[pivot:]
 
 
 def intersectable(P: RelationalPath, Q: RelationalPath) -> bool:
@@ -110,40 +126,20 @@ def intersectable(P: RelationalPath, Q: RelationalPath) -> bool:
     if P == Q:
         return True  # behavior changed
 
-    return P.base == Q.base and P.terminal == Q.terminal and llrsp(P, Q) + llrsp(P.reverse(), Q.reverse()) <= min(
-        len(P), len(Q))
+    return (
+        P.base == Q.base
+        and P.terminal == Q.terminal
+        and llrsp(P, Q) + llrsp(P.reverse(), Q.reverse()) <= min(len(P), len(Q))
+    )
 
 
-# def intersectible(P: RelationalPath, Q: RelationalPath):
-#     """See [1,2] for the description of intersectible
-#
-#     References
-#     ----------
-#     [1] Marc Maier (2014),
-#         Causal Discovery for Relational Domains:
-#         Representation, Reasoning, and Learning,
-#         Ph.D. Dissertation, University of Massachusetts, Amherst
-#     [2] Sanghack Lee and Vasant Honavar (2015),
-#         Lifted Representation of Relational Causal Models Revisited:
-#         Implications for Reasoning and Structure Learning,
-#         In Proceedings of Workshop on Advances in Causal Inference co-located with UAI 2015
-#     """
-#     raise Exception('use intersectable')
-#     # __validate_rpath(P)
-#     # __validate_rpath(Q)
-#     # if P == Q:
-#     #     raise ValueError('{} == {}'.format(P, Q))
-#     #
-#     # return P.base == Q.base and P.terminal == Q.terminal and llrsp(P, Q) + llrsp(reversed(P), reversed(Q)) <= min(
-#     #     len(P), len(Q))
-#
-#
-# def co_intersectible(Q: RelationalPath, R: RelationalPath, P: RelationalPath, P_prime: RelationalPath, schema: RelationalSchema = None):
-#     raise Exception('use co_intersectable')
-#     # return co_intersectible(Q, R, P, P_prime, schema)
-
-
-def co_intersectable(Q: RelationalPath, R: RelationalPath, P: RelationalPath, P_prime: RelationalPath, schema: RelationalSchema = None) -> bool:
+def co_intersectable(
+    Q: RelationalPath,
+    R: RelationalPath,
+    P: RelationalPath,
+    P_prime: RelationalPath,
+    schema: RelationalSchema = None,
+) -> bool:
     """
     Whether two intersectable relational paths P and P' can join at the end with a relational path Q and R extended.
 
@@ -178,20 +174,25 @@ def co_intersectable(Q: RelationalPath, R: RelationalPath, P: RelationalPath, P_
         assert all(len(set(path)) == len(path) for path in paths)  # time consuming checking ...
         return True
 
-    items_of = {'P': p_items, 'P_prime': p2_items, 'Q': q_items, 'R': r_items}
-    rpaths = {'P': P, 'P_prime': P_prime, 'Q': Q, 'R': R}
-    for A, B in combinations(('P', 'P_prime', 'Q'), 2):
-        if not all(merge(items_of[A][i], items_of[B][i]) for i in range(llrsp(rpaths[A], rpaths[B]))):
+    items_of = {"P": p_items, "P_prime": p2_items, "Q": q_items, "R": r_items}
+    rpaths = {"P": P, "P_prime": P_prime, "Q": Q, "R": R}
+    for A, B in combinations(("P", "P_prime", "Q"), 2):
+        if not all(
+            merge(items_of[A][i], items_of[B][i]) for i in range(llrsp(rpaths[A], rpaths[B]))
+        ):
             return False
-    for A, B in combinations(('P', 'P_prime', 'R'), 2):
-        if not all(merge(items_of[A][-1 - i], items_of[B][-1 - i]) for i in range(llrsp(rpaths[A].reverse(), rpaths[B].reverse()))):
+    for A, B in combinations(("P", "P_prime", "R"), 2):
+        if not all(
+            merge(items_of[A][-1 - i], items_of[B][-1 - i])
+            for i in range(llrsp(rpaths[A].reverse(), rpaths[B].reverse()))
+        ):
             return False
 
     if not all(merge(q_items[-1 - i], r_items[i]) for i in range(llrsp(Q.reverse(), R))):
         return False
 
     item_class_of = dict()
-    for rpath_name in ['P', 'P_prime', 'Q', 'R']:
+    for rpath_name in ["P", "P_prime", "Q", "R"]:
         rpath = rpaths[rpath_name]
         items = items_of[rpath_name]
         item_class_of.update({item: rpath[at] for at, item in enumerate(items)})
@@ -201,7 +202,7 @@ def co_intersectable(Q: RelationalPath, R: RelationalPath, P: RelationalPath, P_
     while to_merges:
         # refresh adjacent information
         adjacencies = defaultdict(set)
-        for rpath_name in ['P', 'P_prime', 'Q', 'R']:
+        for rpath_name in ["P", "P_prime", "Q", "R"]:
             items = items_of[rpath_name]
             for i, j in zip(items, items[1:]):
                 adjacencies[i].add(j)
@@ -212,11 +213,13 @@ def co_intersectable(Q: RelationalPath, R: RelationalPath, P: RelationalPath, P_
         for item, neighbors in adjacencies.items():
             item_class = item_class_of[item]
             neighbors = list(neighbors)
-            for neighbor_item_class, neighbors_of_item_class in group_by(neighbors, lambda ne: item_class_of[ne]):
+            for neighbor_item_class, neighbors_of_item_class in group_by(
+                neighbors, lambda ne: item_class_of[ne]
+            ):
                 if len(neighbors_of_item_class) > 1:
-                    if item_class.is_relationship_class:  # R--one E
-                        to_merges.append(list(neighbors_of_item_class))
-                    elif not neighbor_item_class.is_many(item_class):  # E -- neighbor R
+                    if item_class.is_relationship_class or not neighbor_item_class.is_many(
+                        item_class
+                    ):  # R--one E
                         to_merges.append(list(neighbors_of_item_class))
 
         for to_merge in to_merges:
@@ -270,72 +273,72 @@ class UnvisitedQueue:
 
 
 def d_separated(dag: nx.DiGraph, x, y, zs=frozenset()) -> bool:
-    """A simple implementation of d-separation. """
+    """A simple implementation of d-separation."""
     assert x != y
     assert x not in zs and y not in zs
 
-    qq = UnvisitedQueue(((x, '>'), (x, '<')))
+    qq = UnvisitedQueue(((x, ">"), (x, "<")))
     while qq:
         node, direction = qq.pop()
-        if direction == '>':
+        if direction == ">":
             if node not in zs:
-                qq.puts((ch, '>') for ch in dag.successors(node))
+                qq.puts((ch, ">") for ch in dag.successors(node))
             else:
-                qq.puts((pa, '<') for pa in dag.predecessors(node))
+                qq.puts((pa, "<") for pa in dag.predecessors(node))
 
         else:  # '<'
             if node not in zs:
-                qq.puts((ch, '>') for ch in dag.successors(node))
-                qq.puts((pa, '<') for pa in dag.predecessors(node))
+                qq.puts((ch, ">") for ch in dag.successors(node))
+                qq.puts((pa, "<") for pa in dag.predecessors(node))
 
-        if {(y, '>'), (y, '<')} & qq.visited:
+        if {(y, ">"), (y, "<")} & qq.visited:
             return False
 
     return True
 
 
 def d_separated_tracking(dag: nx.DiGraph, x, y, zs=frozenset()):
-    """A simple implementation of d-separation. """
+    """A simple implementation of d-separation."""
     assert x != y
     assert x not in zs and y not in zs
 
-    qq = deque(((x, '>'), (x, '<')))
+    qq = deque(((x, ">"), (x, "<")))
     visited = set()
     previous = dict()
     while qq:
         node, direction = prev = qq.pop()
-        if direction == '>':
+        if direction == ">":
             if node not in zs:
                 for ch in dag.successors(node):
-                    if (ch, '>') not in visited:
-                        qq.append((ch, '>'))
-                        visited.add((ch, '>'))
-                        previous[(ch, '>')] = prev
+                    if (ch, ">") not in visited:
+                        qq.append((ch, ">"))
+                        visited.add((ch, ">"))
+                        previous[(ch, ">")] = prev
             else:
                 for pa in dag.predecessors(node):
-                    if (pa, '<') not in visited:
-                        qq.append((pa, '<'))
-                        visited.add((pa, '<'))
-                        previous[(pa, '<')] = prev
+                    if (pa, "<") not in visited:
+                        qq.append((pa, "<"))
+                        visited.add((pa, "<"))
+                        previous[(pa, "<")] = prev
 
         else:  # '<'
             if node not in zs:
                 for ch in dag.successors(node):
-                    if (ch, '>') not in visited:
-                        qq.append((ch, '>'))
-                        visited.add((ch, '>'))
-                        previous[(ch, '>')] = prev
+                    if (ch, ">") not in visited:
+                        qq.append((ch, ">"))
+                        visited.add((ch, ">"))
+                        previous[(ch, ">")] = prev
                 for pa in dag.predecessors(node):
-                    if (pa, '<') not in visited:
-                        qq.append((pa, '<'))
-                        visited.add((pa, '<'))
-                        previous[(pa, '<')] = prev
+                    if (pa, "<") not in visited:
+                        qq.append((pa, "<"))
+                        visited.add((pa, "<"))
+                        previous[(pa, "<")] = prev
 
-        if {(y, '>'), (y, '<')} & visited:
-            if (y, '>') in visited:
-                last = (y, '>')
+        if {(y, ">"), (y, "<")} & visited:
+            if (y, ">") in visited:
+                last = (y, ">")
             else:
-                last = (y, '<')
+                last = (y, "<")
             history = deque()
             while last:
                 if last in history:  # but why?
@@ -345,10 +348,10 @@ def d_separated_tracking(dag: nx.DiGraph, x, y, zs=frozenset()):
                     last = previous[last]
                 else:
                     last = False
-            outstr = ''
+            outstr = ""
             for at, direction in list(history):
                 if outstr:
-                    outstr += ' ' + str(direction) + ' ' + str(at)
+                    outstr += " " + str(direction) + " " + str(at)
                 else:
                     outstr = str(at)
             print(outstr)
@@ -374,12 +377,12 @@ class AbstractGroundGraph(CITester):
     AGGs does not correctly reason about the relational d-separation.
     """
 
-    def ci_test_data(self, x, y, zs, attrs, base_items, query_name='') -> CITestResult:
-        raise NotImplementedError('AGG does not handle real-data.')
+    def ci_test_data(self, x, y, zs, attrs, base_items, query_name="") -> CITestResult:
+        raise NotImplementedError("AGG does not handle real-data.")
 
     def __init__(self, rcm: RCM, h: int):
         super().__init__()
-        self.logger = logging.getLogger(self.__class__.__module__ + '.' + self.__class__.__name__)
+        self.logger = logging.getLogger(self.__class__.__module__ + "." + self.__class__.__name__)
         c1 = interner()  # memory-saver, takes time...
         c2 = interner()  # memory-saver, takes time...
         #
@@ -405,7 +408,7 @@ class AbstractGroundGraph(CITester):
                     self.extend[rv2].add(iv)
 
                     if not (len(self.IVs) % 1000):
-                        self.logger.info('creating {} of IVs.'.format(len(self.IVs)))
+                        self.logger.info(f"creating {len(self.IVs)} of IVs.")
         # RVEs and IVEs
         for Y, Qys in group_by(self.RVs, lambda rv: rv.attr):
             for RxVy in filter(lambda d: d.effect.attr == Y, rcm.directed_dependencies):
@@ -416,7 +419,7 @@ class AbstractGroundGraph(CITester):
                         self.RVEs.add((Px, Qy))  # P.X --> Q.Y
 
                         if not (len(self.RVEs) % 1000):
-                            self.logger.info('creating {} of RVEs.'.format(len(self.RVEs)))
+                            self.logger.info(f"creating {len(self.RVEs)} of RVEs.")
 
                         # Q, R, P, P_prime
                         for P_prime in self.combined[P]:
@@ -425,7 +428,7 @@ class AbstractGroundGraph(CITester):
                                 self.IVEs.add((iv, Qy))
 
                                 if not (len(self.IVEs) % 1000):
-                                    self.logger.info('creating {} of IVEs.'.format(len(self.IVEs)))
+                                    self.logger.info(f"creating {len(self.IVEs)} of IVEs.")
                         # P, reversed(R), Q, Q_prime
                         for Q_prime in self.combined[Q]:
                             if co_intersectable(P, R.reverse(), Q, Q_prime):
@@ -433,7 +436,7 @@ class AbstractGroundGraph(CITester):
                                 self.IVEs.add((Px, iv))
 
                                 if not (len(self.IVEs) % 1000):
-                                    self.logger.info('creating {} of IVEs.'.format(len(self.IVEs)))
+                                    self.logger.info(f"creating {len(self.IVEs)} of IVEs.")
 
         self.RVs = frozenset(self.RVs)
         self.RVEs = frozenset(self.RVEs)
@@ -465,7 +468,7 @@ class AbstractGroundGraph(CITester):
         for x_ in x_bar:
             for y_ in y_bar:
                 if not d_separated(self.agg, x_, y_, zs_bar):
-                    if 'track' in options:
+                    if "track" in options:
                         d_separated_tracking(self.agg, x_, y_, zs_bar)
                     return CITestResult(query, False)
         return CITestResult(query, True)
@@ -488,73 +491,81 @@ class AbstractRCD:
         self.verbose = verbose
 
     def ci_test(self, cause: RelationalVariable, effect: RelationalVariable, conds, size: int):
-        assert 0 <= size and effect.is_canonical
+        assert size >= 0 and effect.is_canonical
 
         for cond in combinations(conds, size):
             if self.verbose:
-                print('ci testing: {} _||_ {} | {}'.format(cause, effect, cond))
+                print(f"ci testing: {cause} _||_ {effect} | {cond}")
             ci_result = self.ci_tester.ci_test(cause, effect, cond)
             if bool(ci_result):
                 if self.verbose:
                     if self.ci_tester.is_p_value_available:
-                        print('p={}\t{} _||_ {} | {}'.format(ci_result.p, cause, effect, cond))
+                        print(f"p={ci_result.p}\t{cause} _||_ {effect} | {cond}")
                     else:
-                        print('p=unknown\t{} _||_ {} | {}'.format(cause, effect, cond))
+                        print(f"p=unknown\t{cause} _||_ {effect} | {cond}")
                 self.sepset[frozenset((cause, effect))] = set(cond)
                 return True
             else:
                 if self.verbose:
                     if self.ci_tester.is_p_value_available:
-                        print('p={}\t{} _NOT||_ {} | {}'.format(ci_result.p, cause, effect, cond))
+                        print(f"p={ci_result.p}\t{cause} _NOT||_ {effect} | {cond}")
                     else:
-                        print('p=unknown\t{} _NOT||_ {} | {}'.format(cause, effect, cond))
+                        print(f"p=unknown\t{cause} _NOT||_ {effect} | {cond}")
         if self.verbose:
-            print('NOT {} _||_ {} | {} with {}-subsets'.format(cause, effect, conds, size))
+            print(f"NOT {cause} _||_ {effect} | {conds} with {size}-subsets")
         return False
 
     def phase_I(self, truth: RCM = None):
         """Find adjacencies of the underlying RCM."""
         if self.verbose:
-            print('phase I: started.')
-        prcm, schema, ci_tester = self.prcm, self.schema, self.ci_tester
+            print("phase I: started.")
+        prcm = self.prcm
 
         # Initialize an undirected RCM
-        udeps_to_be_tested = set(UndirectedRDep(dep) for dep in enumerate_rdeps(self.schema, self.h_max))
+        udeps_to_be_tested = set(
+            UndirectedRDep(dep) for dep in enumerate_rdeps(self.schema, self.h_max)
+        )
         prcm.add(udeps_to_be_tested)
         deps_to_be_tested = {dep for udep in udeps_to_be_tested for dep in udep}
 
         for d in count():
             if self.verbose:
-                print('phase I: checking depth: {}'.format(d))
+                print(f"phase I: checking depth: {d}")
             to_remove = set()
             for dep in safe_iter(deps_to_be_tested):
                 if self.verbose:
-                    print('phase I: checking: {}'.format(dep))
+                    print(f"phase I: checking: {dep}")
                 cause, effect = dep
                 assert len(prcm.ne(effect)) - 1 >= d
                 if self.ci_test(cause, effect, prcm.ne(effect) - {cause}, d):
                     if truth and cause in truth.adj(effect):
                         if self.verbose:
-                            print('False negative: {}'.format(dep))
+                            print(f"False negative: {dep}")
                     else:
                         deps_to_be_tested -= {dep, reversed(dep)}
                         to_remove.add(UndirectedRDep(dep))
                 else:
-                    if truth and len(truth.pa(effect)) == d and cause not in truth.pa(effect) and \
-                            cause.attr not in truth.class_dependency_graph.de(effect.attr):
+                    if (
+                        truth
+                        and len(truth.pa(effect)) == d
+                        and cause not in truth.pa(effect)
+                        and cause.attr not in truth.class_dependency_graph.de(effect.attr)
+                    ):
                         if self.verbose:
-                            print('False positive: {}'.format(dep))
+                            print(f"False positive: {dep}")
                         deps_to_be_tested -= {dep, reversed(dep)}
                         to_remove.add(UndirectedRDep(dep))
 
             # post clean up
             prcm.remove(to_remove)
-            deps_to_be_tested = set(filter(lambda dep: len(prcm.ne(dep.effect)) - 1 >= d + 1, deps_to_be_tested))
+            deps_to_be_tested = set(
+                filter(lambda dep: len(prcm.ne(dep.effect)) - 1 >= d + 1, deps_to_be_tested)
+            )
             if not deps_to_be_tested:
                 break
 
         if self.verbose:
-            print('phase I: finished.')
+            print("phase I: finished.")
         return self.prcm
 
     def find_sepset(self, Vx, Rz):
@@ -624,7 +635,7 @@ def sound_rules(g: PDAG, non_colliders=(), purge=True):
             break
 
 
-def completes(g: PDAG, non_colliders: Set):
+def completes(g: PDAG, non_colliders: set):
     """Maximally orients edges in the given PDAG with non-collider constraints"""
     U = unions({(x, y), (y, x)} for x, y in g.unoriented())
 
@@ -646,12 +657,14 @@ def completes(g: PDAG, non_colliders: Set):
             U -= {(x, y), (y, x)}
 
 
-def ext(g: PDAG, NC: Set) -> bool:
+def ext(g: PDAG, NC: set) -> bool:
     """Extensibility where non-colliders are completely identified."""
     h = g.copy()
     while h:
         for y in h:
-            if not h.ch(y) and all(SymTriple(x, y, z) not in NC for x, z in combinations(h.adj(y), 2)):
+            if not h.ch(y) and all(
+                SymTriple(x, y, z) not in NC for x, z in combinations(h.adj(y), 2)
+            ):
                 for x in h.ne(y):
                     g.orient(x, y)
                 h.remove_vertex(y)
@@ -699,7 +712,7 @@ class RpCD(AbstractRCD):
         """Maximally-orient undirected dependencies"""
 
         if self.verbose:
-            print('phase II: started.')
+            print("phase II: started.")
         pcdg = self.prcm.class_dependency_graph
 
         if background_knowledge:
@@ -733,13 +746,13 @@ class RpCD(AbstractRCD):
             self.prcm.orient_with(x, y)
 
         if self.verbose:
-            print('phase II: finished.')
+            print("phase II: finished.")
         return self.prcm
 
 
 def joinable(p, *args):
     for q in args:
-        p = p ** q
+        p = p**q
         if p is None:
             return False
     return True
@@ -758,16 +771,19 @@ def restore_anchors(P, Q, a_r, b_r, a_s, b_s, a_t=None, b_t=None):
     # (...|P|-1, 0...)
     # (a_r..., ...b_r) (...a_r, ...b_r)
     # (a_s..., b_s...) (a_s..., ...b_s)
-    J = {(last_P - i, first_Q + i) for i in range(llrsp(P[::-1], Q))} | \
-        {(a_r + i, b_r - i) for i in range(llrsp(P[a_r:], Q[:b_r:-1]))} | \
-        {(a_r - i, b_r - i) for i in range(llrsp(P[:a_r:-1], Q[:b_r:-1]))} | \
-        {(a_s + i, b_s + i) for i in range(llrsp(P[a_s:], Q[b_s:]))} | \
-        {(a_s + i, b_s - i) for i in range(llrsp(P[a_s:], Q[:b_s:-1]))}
+    J = (
+        {(last_P - i, first_Q + i) for i in range(llrsp(P[::-1], Q))}
+        | {(a_r + i, b_r - i) for i in range(llrsp(P[a_r:], Q[:b_r:-1]))}
+        | {(a_r - i, b_r - i) for i in range(llrsp(P[:a_r:-1], Q[:b_r:-1]))}
+        | {(a_s + i, b_s + i) for i in range(llrsp(P[a_s:], Q[b_s:]))}
+        | {(a_s + i, b_s - i) for i in range(llrsp(P[a_s:], Q[:b_s:-1]))}
+    )
 
     if a_t is not None and b_t is not None:
         # (a_t..., ...b_t) (...a_t, ...b_t)
-        J |= {(a_t + i, b_t - i) for i in range(llrsp(P[a_t:], Q[:b_t:-1]))} | \
-             {(a_t - i, b_t - i) for i in range(llrsp(P[:a_t:-1], Q[:b_t:-1]))}
+        J |= {(a_t + i, b_t - i) for i in range(llrsp(P[a_t:], Q[:b_t:-1]))} | {
+            (a_t - i, b_t - i) for i in range(llrsp(P[:a_t:-1], Q[:b_t:-1]))
+        }
 
     return J
 
@@ -785,17 +801,17 @@ def anchors_to_skeleton(schema: RelationalSchema, P: RelationalPath, Q: Relation
     pp = [None] * len(P)
     qq = [None] * len(Q)
     for a, b in J:
-        pp[a] = qq[b] = SkItem('p' + str(a) + 'q' + str(b), P[a])
+        pp[a] = qq[b] = SkItem("p" + str(a) + "q" + str(b), P[a])
         temp_g.add_node(pp[a])
 
     # P only
     aa, bb = zip(*J)
     for a in set(range(len(P))) - set(aa):
-        pp[a] = SkItem('p' + str(a), P[a])
+        pp[a] = SkItem("p" + str(a), P[a])
         temp_g.add_node(pp[a])
     # Q only
     for b in set(range(len(Q))) - set(bb):
-        qq[b] = SkItem('q' + str(b), Q[b])
+        qq[b] = SkItem("q" + str(b), Q[b])
         temp_g.add_node(qq[b])
 
     temp_g.add_edges_from(list(zip(pp, pp[1:])))
@@ -806,7 +822,7 @@ def anchors_to_skeleton(schema: RelationalSchema, P: RelationalPath, Q: Relation
     for v in list(temp_g.nodes):
         if v.item_class.is_relationship_class:
             missing = set(v.item_class.entities) - {ne.item_class for ne in temp_g.neighbors(v)}
-            auxs = {SkItem('aux' + str(next(cc)), ic) for ic in missing}
+            auxs = {SkItem("aux" + str(next(cc)), ic) for ic in missing}
             all_auxs |= auxs
             temp_g.add_nodes_from(auxs)
             for aux in auxs:
@@ -824,7 +840,13 @@ def anchors_to_skeleton(schema: RelationalSchema, P: RelationalPath, Q: Relation
 
 # written for readability
 # can be faster by employing a view-class for RPath for the slicing operator
-def canonical_unshielded_triples(M: PRCM, PyVx: RelationalDependency = None, QzVy: RelationalDependency = None, single=True, with_anchors=False):
+def canonical_unshielded_triples(
+    M: PRCM,
+    PyVx: RelationalDependency = None,
+    QzVy: RelationalDependency = None,
+    single=True,
+    with_anchors=False,
+):
     """Returns a CUT, if exists, or generate CUTs with/without anchors
 
     Parameters
@@ -844,8 +866,9 @@ def canonical_unshielded_triples(M: PRCM, PyVx: RelationalDependency = None, QzV
     """
     if PyVx is None or QzVy is None:
         assert PyVx is None and QzVy is None
-        all_ds = {dd for d in M.directed_dependencies for dd in (d, reversed(d))} | \
-                 {d for u in M.undirected_dependencies for d in u}
+        all_ds = {dd for d in M.directed_dependencies for dd in (d, reversed(d))} | {
+            d for u in M.undirected_dependencies for d in u
+        }
         to_chain = []
         skip = set()
         for PyVx in all_ds:
@@ -861,7 +884,9 @@ def canonical_unshielded_triples(M: PRCM, PyVx: RelationalDependency = None, QzV
                             to_chain.append(cut)
                             break
                     else:
-                        to_chain.append(inner_canonical_unshielded_triples(M, PyVx, QzVy, with_anchors))
+                        to_chain.append(
+                            inner_canonical_unshielded_triples(M, PyVx, QzVy, with_anchors)
+                        )
         if single:
             return to_chain
         else:
@@ -876,7 +901,9 @@ def canonical_unshielded_triples(M: PRCM, PyVx: RelationalDependency = None, QzV
         return inner_canonical_unshielded_triples(M, PyVx, QzVy, with_anchors)
 
 
-def inner_canonical_unshielded_triples(M: PRCM, PyVx: RelationalDependency, QzVy: RelationalDependency, with_anchors=False):
+def inner_canonical_unshielded_triples(
+    M: PRCM, PyVx: RelationalDependency, QzVy: RelationalDependency, with_anchors=False
+):
     """A generator that yields CUTs sufficient to identify the pattern of an RCM under path semantics."""
     LL = llrsp
 
@@ -887,7 +914,7 @@ def inner_canonical_unshielded_triples(M: PRCM, PyVx: RelationalDependency, QzVy
     V, Y2 = Vy
 
     if Y != Y2:
-        raise ValueError("{} and {} do not share the common attribute class.".format(PyVx, QzVy))
+        raise ValueError(f"{PyVx} and {QzVy} do not share the common attribute class.")
 
     m, n = len(P), len(Q)
     l = LL(P.reverse(), Q)
@@ -943,14 +970,16 @@ def inner_canonical_unshielded_triples(M: PRCM, PyVx: RelationalDependency, QzVy
                     continue
                 assert intersectable(PB, QA) or 1 < l_beta < min(len(PB), len(QB))
 
-                a_z, b_z = a_s + l_beta - 1, b_s - l_beta + 1
+                _, b_z = a_s + l_beta - 1, b_s - l_beta + 1
                 # the third characteristic anchor
                 for a_t, b_t in J:
                     if not (a_r < a_t <= a_x and b_x <= b_t < b_z):
                         continue
                     if not joinable(P[:a_s], Q[b_t:b_s:-1], P[a_r:a_t:-1], Q[b_r:]):
                         continue
-                    RtZ = RelationalVariable(P[:a_s] ** Q[b_t:b_s:-1] ** P[a_r:a_t:-1] ** Q[b_r:], Z)
+                    RtZ = RelationalVariable(
+                        P[:a_s] ** Q[b_t:b_s:-1] ** P[a_r:a_t:-1] ** Q[b_r:], Z
+                    )
                     if RtZ in M.adj(Vx):
                         continue
 
@@ -960,17 +989,24 @@ def inner_canonical_unshielded_triples(M: PRCM, PyVx: RelationalDependency, QzVy
                         continue
 
                     l_gamma = LL(PC, QD)
-                    assert 1 <= l_gamma
-                    if l_gamma == 1 and intersectable(PD, QD) or 1 < l_gamma < min(len(PC),
-                                                                                   len(QD)) and a_t < a_x and b_x < b_t:
+                    assert l_gamma >= 1
+                    if (
+                        l_gamma == 1
+                        and intersectable(PD, QD)
+                        or 1 < l_gamma < min(len(PC), len(QD))
+                        and a_t < a_x
+                        and b_x < b_t
+                    ):
                         a_w, b_w = a_t - l_gamma + 1, b_t - l_gamma + 1
 
-                        PP = {P,
-                              P[:a_w] ** Q[:b_w:-1],
-                              P[:a_s] ** Q[:b_s:-1],
-                              P[:a_s] ** Q[b_t:b_s:-1] ** P[a_t:],
-                              P[:a_s] ** Q[b_s:b_r] ** P[a_r:],
-                              P[:a_s] ** Q[b_s:b_r] ** P[a_r:a_w] ** Q[:b_w:-1]}
+                        PP = {
+                            P,
+                            P[:a_w] ** Q[:b_w:-1],
+                            P[:a_s] ** Q[:b_s:-1],
+                            P[:a_s] ** Q[b_t:b_s:-1] ** P[a_t:],
+                            P[:a_s] ** Q[b_s:b_r] ** P[a_r:],
+                            P[:a_s] ** Q[b_s:b_r] ** P[a_r:a_w] ** Q[:b_w:-1],
+                        }
 
                         PP_Y = frozenset({RelationalVariable(PP_i, Y) for PP_i in PP})
 
@@ -1008,9 +1044,13 @@ def markov_equivalence(model: RCM, verbose=False) -> PRCM:
         (_, X), (_, Y), (_, Z) = Vx, Py, Rz
 
         # not so efficient
-        if cprcm.class_dependency_graph.is_oriented_as(X, Y) and cprcm.class_dependency_graph.is_oriented_as(Z, Y):
+        if cprcm.class_dependency_graph.is_oriented_as(
+            X, Y
+        ) and cprcm.class_dependency_graph.is_oriented_as(Z, Y):
             continue
-        if cprcm.class_dependency_graph.is_oriented_as(Y, X) or cprcm.class_dependency_graph.is_oriented_as(Y, Z):
+        if cprcm.class_dependency_graph.is_oriented_as(
+            Y, X
+        ) or cprcm.class_dependency_graph.is_oriented_as(Y, Z):
             continue
         if SymTriple(X, Y, Z) in NC:
             continue
@@ -1020,19 +1060,19 @@ def markov_equivalence(model: RCM, verbose=False) -> PRCM:
             cprcm.orient_with(X, Y)
             cprcm.orient_with(Z, Y)
             if verbose:
-                print("CUT: {}".format(cut))
-                print("orienting {} -> {} <- {}".format(X, Y, Z))
+                print(f"CUT: {cut}")
+                print(f"orienting {X} -> {Y} <- {Z}")
         elif X == Z:  # RBO
             cprcm.orient_with(Y, X)
             if verbose:
-                print("CUT: {}".format(cut))
-                print("orienting {} <- {} -> {}".format(X, Y, X))
+                print(f"CUT: {cut}")
+                print(f"orienting {X} <- {Y} -> {X}")
         else:
             # canonical unshielded non-colliders
             NC.add(SymTriple(X, Y, Z))
             if verbose:
-                print("CUT: {}".format(cut))
-                print("as a non-collider {} - {} - {}".format(X, Y, Z))
+                print(f"CUT: {cut}")
+                print(f"as a non-collider {X} - {Y} - {Z}")
 
     # CPRCM
     pcdg = cprcm.class_dependency_graph
@@ -1070,7 +1110,9 @@ def rbos_colliders_non_colliders(model: RCM):
         else:
             non_colliders.add(xyz)
 
-    return namedtuple('OrientableTestsStats', ['rbos', 'colliders', 'non_colliders'])(frozenset(rbos), frozenset(colliders), frozenset(non_colliders))
+    return namedtuple("OrientableTestsStats", ["rbos", "colliders", "non_colliders"])(
+        frozenset(rbos), frozenset(colliders), frozenset(non_colliders)
+    )
 
 
 def markov_equivalent(model1: RCM, model2: RCM) -> bool:
@@ -1078,7 +1120,7 @@ def markov_equivalent(model1: RCM, model2: RCM) -> bool:
     return markov_equivalence(model1) == markov_equivalence(model2)
 
 
-def new_extend(P: RelationalPath, Q: RelationalPath) -> List[RelationalPath]:
+def new_extend(P: RelationalPath, Q: RelationalPath) -> list[RelationalPath]:
     """ """
     return list(set(new_extend_iter2(P, Q)))
 
@@ -1141,7 +1183,11 @@ def new_extend_iter(P: RelationalPath, Q: RelationalPath, with_anchors=False):
         l_alpha = LL(Q[b_x:b_r:-1], P[:a_r:-1])
         if l_alpha == 1:
             if intersectable(P[a_r:a_x], Q[b_x:b_r:-1]):
-                yield Rr if not with_anchors else (Rr, frozenset(restore_anchors(P, Q, a_r, b_r, a_r, b_r)))
+                yield (
+                    Rr
+                    if not with_anchors
+                    else (Rr, frozenset(restore_anchors(P, Q, a_r, b_r, a_r, b_r)))
+                )
 
         elif l_alpha < b_r - b_x + 1 and a_r < a_x and b_x < b_r:
             a_y, b_y = a_r - l_alpha + 1, b_r - l_alpha + 1
@@ -1164,7 +1210,7 @@ def new_extend_iter(P: RelationalPath, Q: RelationalPath, with_anchors=False):
                     continue
                 assert intersectable(PB, QA) or 1 < l_beta < min(len(PB), len(QB))
 
-                a_z, b_z = a_s + l_beta - 1, b_s - l_beta + 1
+                _, b_z = a_s + l_beta - 1, b_s - l_beta + 1
                 # the third characteristic anchor
                 for a_t, b_t in J:
                     if not (a_r < a_t <= a_x and b_x <= b_t < b_z):
@@ -1173,4 +1219,8 @@ def new_extend_iter(P: RelationalPath, Q: RelationalPath, with_anchors=False):
                         continue
                     Rt = P[:a_s] ** Q[b_t:b_s:-1] ** P[a_r:a_t:-1] ** Q[b_r:]
                     for R in {Rr, Rs, Rt}:
-                        yield R if not with_anchors else (R, frozenset(restore_anchors(P, Q, a_r, b_r, a_s, b_s, a_t, b_t)))
+                        yield (
+                            R
+                            if not with_anchors
+                            else (R, frozenset(restore_anchors(P, Q, a_r, b_r, a_s, b_s, a_t, b_t)))
+                        )

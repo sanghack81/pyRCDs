@@ -1,10 +1,10 @@
 import functools
 import itertools
+from abc import ABC, abstractmethod
 from collections import defaultdict, Counter
 from enum import IntEnum
 from functools import total_ordering
 from itertools import chain
-from typing import Set, FrozenSet, Dict, List
 
 import networkx as nx
 from numpy.random.mtrand import random_sample, choice, randint
@@ -14,14 +14,15 @@ from pyrcds.utils import between_sampler
 
 class Cardinality(IntEnum):
     """Define constants for how many relationships an entity can participate in"""
+
     one = 1
     many = 2
 
     def __str__(self):
-        return type(self).__name__ + '.' + self.name
+        return type(self).__name__ + "." + self.name
 
     def __repr__(self):
-        return type(self).__name__ + '.' + self.name
+        return type(self).__name__ + "." + self.name
 
     @staticmethod
     def from_int(v: int):
@@ -29,10 +30,10 @@ class Cardinality(IntEnum):
             return Cardinality.one
         elif v == 2:
             return Cardinality.many
-        raise ValueError(f'unknown Cardinality: {v}')
+        raise ValueError(f"unknown Cardinality: {v}")
 
 
-def _names(ys) -> Set[str]:
+def _names(ys) -> set[str]:
     return {y.name for y in ys}
 
 
@@ -46,7 +47,7 @@ class SchemaElement:
 
     def __init__(self, name: str):
         if not isinstance(name, str) or not name:
-            raise ValueError('A name must be a non-empty string')
+            raise ValueError("A name must be a non-empty string")
 
         self.name = name
         self.__h = hash(self.name)
@@ -64,7 +65,7 @@ class SchemaElement:
         return self.name < other.name
 
 
-class ItemClass(SchemaElement):
+class ItemClass(SchemaElement, ABC):
     """An item class of a relational schema"""
 
     def __init__(self, name: str, attrs=()):
@@ -82,20 +83,22 @@ class ItemClass(SchemaElement):
         elif isinstance(attrs, str):
             attrs = {AttributeClass(attrs)}
         attrs = {AttributeClass(a) if isinstance(a, str) else a for a in attrs}
-        assert all(isinstance(a, AttributeClass) for a in attrs)
-        assert name not in _names(attrs)
+        if not all(isinstance(a, AttributeClass) for a in attrs):
+            raise TypeError("All attributes must be AttributeClass instances")
+        if name in _names(attrs):
+            raise ValueError(f"Item class name '{name}' must not collide with attribute names")
 
         super().__init__(name)
         self.attrs = frozenset(attrs)
         self.attribute_classes = self.attrs
 
     @property
-    def is_entity_class(self):
-        raise AssertionError('abstract')
+    @abstractmethod
+    def is_entity_class(self) -> bool: ...
 
     @property
-    def is_relationship_class(self):
-        raise AssertionError('abstract')
+    @abstractmethod
+    def is_relationship_class(self) -> bool: ...
 
 
 class EntityClass(ItemClass):
@@ -105,16 +108,15 @@ class EntityClass(ItemClass):
         super().__init__(name, attrs)
 
     def __repr__(self):
-        attr_part = ', '.join(str(a) for a in sorted(self.attrs)) if self.attrs else ''
+        attr_part = ", ".join(str(a) for a in sorted(self.attrs)) if self.attrs else ""
         return self.name + "(" + attr_part + ")"
 
-    def to_dict(self) -> Dict:
-        return {'name': self.name,
-                'attrs': [a.name for a in self.attrs]}
+    def to_dict(self) -> dict:
+        return {"name": self.name, "attrs": [a.name for a in self.attrs]}
 
     @staticmethod
-    def from_dict(dic) -> 'EntityClass':
-        return EntityClass(dic['name'], dic['attrs'])
+    def from_dict(dic) -> "EntityClass":
+        return EntityClass(dic["name"], dic["attrs"])
 
     @property
     def is_entity_class(self):
@@ -147,24 +149,36 @@ class RelationshipClass(ItemClass):
         return self.__cards[entity] == Cardinality.many
 
     def __repr__(self):
-        attr_part = ', '.join(str(a) for a in sorted(self.attrs)) if self.attrs else '()'
-        card_part = '{' + (
-            ', '.join(
-                [str(e) + ': ' + ('many' if self.is_many(e) else 'one') for e in sorted(self.__cards.keys())])) + '}'
+        attr_part = ", ".join(str(a) for a in sorted(self.attrs)) if self.attrs else "()"
+        card_part = (
+            "{"
+            + (
+                ", ".join(
+                    [
+                        str(e) + ": " + ("many" if self.is_many(e) else "one")
+                        for e in sorted(self.__cards.keys())
+                    ]
+                )
+            )
+            + "}"
+        )
         return self.name + "(" + attr_part + ", " + card_part + ")"
 
     def to_dict(self):
-        return {'name': self.name,
-                'attrs': [a.name for a in self.attrs],
-                'cards': {e.name: int(self.__cards[e]) for e in self.__cards}}
+        return {
+            "name": self.name,
+            "attrs": [a.name for a in self.attrs],
+            "cards": {e.name: int(self.__cards[e]) for e in self.__cards},
+        }
 
     @staticmethod
     def from_dict(dic, es):
         es = {e.name: e for e in es}
-        return RelationshipClass(dic['name'],
-                                 dic['attrs'],
-                                 {es[e]: Cardinality.from_int(dic['cards'][e]) for e in dic['cards']}
-                                 )
+        return RelationshipClass(
+            dic["name"],
+            dic["attrs"],
+            {es[e]: Cardinality.from_int(dic["cards"][e]) for e in dic["cards"]},
+        )
 
     @property
     def is_entity_class(self):
@@ -182,21 +196,33 @@ class AttributeClass(SchemaElement):
         super().__init__(name)
 
     def __repr__(self):
-        return 'A_Class(' + repr(self.name) + ')'
+        return "A_Class(" + repr(self.name) + ")"
 
     def to_dict(self):
-        return {'name': self.name}
+        return {"name": self.name}
 
 
 class RelationalSchema:
     """Relational schema"""
 
-    def __init__(self, entities: Set[EntityClass], relationships: Set[RelationshipClass]):
+    def __init__(self, entities: set[EntityClass], relationships: set[RelationshipClass]):
         """Initialize a relational schema with given entity and relationship classes"""
-        assert all(e.is_entity_class for e in entities)
-        assert all(r.is_relationship_class for r in relationships)
-        assert _is_unique((*_names(entities), *_names(relationships),
-                           *[attr.name for item in (set(entities) | set(relationships)) for attr in item.attrs]))
+        if not all(e.is_entity_class for e in entities):
+            raise TypeError("All entities must be EntityClass instances")
+        if not all(r.is_relationship_class for r in relationships):
+            raise TypeError("All relationships must be RelationshipClass instances")
+        if not _is_unique(
+            (
+                *_names(entities),
+                *_names(relationships),
+                *[
+                    attr.name
+                    for item in (set(entities) | set(relationships))
+                    for attr in item.attrs
+                ],
+            )
+        ):
+            raise ValueError("All names (entities, relationships, attributes) must be unique")
 
         self.entities = frozenset(entities)  # type: FrozenSet[EntityClass]
         self.relationships = frozenset(relationships)  # type: FrozenSet[RelationshipClass]
@@ -222,8 +248,11 @@ class RelationalSchema:
         self.elements = {e.name: e for e in self.entities | self.relationships | self.attrs}
 
     def __eq__(self, other):
-        return isinstance(other, RelationalSchema) and \
-               self.entities == other.entities and self.relationships == other.relationships
+        return (
+            isinstance(other, RelationalSchema)
+            and self.entities == other.entities
+            and self.relationships == other.relationships
+        )
 
     def __getitem__(self, name) -> SchemaElement:
         """Returns a schema element given its name"""
@@ -238,37 +267,71 @@ class RelationalSchema:
         return item in self.entities or item in self.relationships or item in self.attrs
 
     def __str__(self):
-        return "RSchema(" + ', '.join(e.name for e in sorted(self.entities | self.relationships)) + ")"
+        return (
+            "RSchema(" + ", ".join(e.name for e in sorted(self.entities | self.relationships)) + ")"
+        )
 
     def __repr__(self):
-        return "RSchema(Entity classes: " + repr(sorted(self.entities)) + ", Relationship classes: " + repr(
-            sorted(self.relationships)) + ")"
+        return (
+            "RSchema(Entity classes: "
+            + repr(sorted(self.entities))
+            + ", Relationship classes: "
+            + repr(sorted(self.relationships))
+            + ")"
+        )
 
     def to_code(self):
         lines = list()
         for e in sorted(self.entity_classes):
             if len(e.attribute_classes) == 0:
-                attr_str = '()'
+                attr_str = "()"
             elif len(e.attribute_classes) == 1:
                 attr_str = f"(AttributeClass('{next(iter(e.attribute_classes)).name}'),)"
             else:
-                attr_str = "(" + (', '.join(f"AttributeClass('{attr.name}')" for attr in sorted(e.attribute_classes))) + ")"
+                attr_str = (
+                    "("
+                    + (
+                        ", ".join(
+                            f"AttributeClass('{attr.name}')" for attr in sorted(e.attribute_classes)
+                        )
+                    )
+                    + ")"
+                )
             lines.append(f"{e.name} = EntityClass('{e.name}', {attr_str})")
         for r in sorted(self.relationship_classes):
             if len(r.attribute_classes) == 0:
-                attr_str = '()'
+                attr_str = "()"
             elif len(r.attribute_classes) == 1:
                 attr_str = f"(AttributeClass('{next(iter(r.attribute_classes)).name}'),)"
             else:
-                attr_str = "(" + (', '.join(f"AttributeClass('{attr.name}')" for attr in sorted(r.attribute_classes))) + ")"
-            the_dict = '{' + ', '.join([e.name + ': ' + ('Cardinality.many' if r.is_many(e) else 'Cardinality.one') for e in r.entity_classes]) + '}'
+                attr_str = (
+                    "("
+                    + (
+                        ", ".join(
+                            f"AttributeClass('{attr.name}')" for attr in sorted(r.attribute_classes)
+                        )
+                    )
+                    + ")"
+                )
+            the_dict = (
+                "{"
+                + ", ".join(
+                    [
+                        e.name + ": " + ("Cardinality.many" if r.is_many(e) else "Cardinality.one")
+                        for e in r.entity_classes
+                    ]
+                )
+                + "}"
+            )
             lines.append(f"{r.name} = RelationshipClass('{r.name}', {attr_str}, {the_dict})")
-        lines.append(f'entities = {{{", ".join(e.name for e in sorted(self.entity_classes))}}}')
-        lines.append(f'relationships = {{{", ".join(r.name for r in sorted(self.relationship_classes))}}}')
+        lines.append(f"entities = {{{', '.join(e.name for e in sorted(self.entity_classes))}}}")
+        lines.append(
+            f"relationships = {{{', '.join(r.name for r in sorted(self.relationship_classes))}}}"
+        )
         lines.append("schema = RelationalSchema(entities, relationships)")
-        return '\n'.join(lines)
+        return "\n".join(lines)
 
-    def relateds(self, item_class: ItemClass) -> FrozenSet[ItemClass]:
+    def relateds(self, item_class: ItemClass) -> frozenset[ItemClass]:
         """Neighboring item classes of the given item class"""
         return self.__i2i[item_class]
 
@@ -285,15 +348,18 @@ class RelationalSchema:
                 g.add_edge(self.item_class_of(attr), attr)
         return g
 
-    def to_dict(self) -> Dict[str, List]:
-        return {'entities': [e.to_dict() for e in self.entities],
-                'relationships': [r.to_dict() for r in self.relationships]}
+    def to_dict(self) -> dict[str, list]:
+        return {
+            "entities": [e.to_dict() for e in self.entities],
+            "relationships": [r.to_dict() for r in self.relationships],
+        }
 
     @staticmethod
     def from_dict(dic):
-        es = [EntityClass.from_dict(e) for e in dic['entities']]
-        return RelationalSchema(es,
-                                {RelationshipClass.from_dict(r, es) for r in dic['relationships']})
+        es = [EntityClass.from_dict(e) for e in dic["entities"]]
+        return RelationalSchema(
+            es, {RelationshipClass.from_dict(r, es) for r in dic["relationships"]}
+        )
 
 
 @functools.total_ordering
@@ -424,7 +490,11 @@ class RelationalSkeleton:
 
 
 def ImmutableRSkeleton(skeleton):
-    return ClassImmutableRSkeleton(skeleton) if not isinstance(skeleton, ClassImmutableRSkeleton) else skeleton
+    return (
+        ClassImmutableRSkeleton(skeleton)
+        if not isinstance(skeleton, ClassImmutableRSkeleton)
+        else skeleton
+    )
 
 
 class ClassImmutableRSkeleton(RelationalSkeleton):
@@ -438,26 +508,27 @@ class ClassImmutableRSkeleton(RelationalSkeleton):
         for v in self._nodes:
             neighbors = skeleton.neighbors(v)
             self._ne[(v, None)] = frozenset(neighbors)
-            for k, g in itertools.groupby(sorted(neighbors, key=lambda x: x.item_class),
-                                          key=lambda x: x.item_class):
+            for k, g in itertools.groupby(
+                sorted(neighbors, key=lambda x: x.item_class), key=lambda x: x.item_class
+            ):
                 self._ne[(v, k)] = frozenset(g)
         self._G = nx.freeze(skeleton.as_networkx_ug())
 
     def __setitem__(self, key, value):
-        raise AssertionError('not allowed to modify')
+        raise AssertionError("not allowed to modify")
 
     def __getitem__(self, key):
         item, attr = key
         return item[attr]
 
     def add_entities(self, *args):
-        raise AssertionError('not allowed to modify')
+        raise AssertionError("not allowed to modify")
 
     def add_entity(self, item: SkItem):
-        raise AssertionError('not allowed to modify')
+        raise AssertionError("not allowed to modify")
 
     def add_relationship(self, rel: SkItem, entities):
-        raise AssertionError('not allowed to modify')
+        raise AssertionError("not allowed to modify")
 
     def items(self, filter_type: ItemClass = None):
         if filter_type is not None:
@@ -492,13 +563,14 @@ class cardinality_sampler:
             return Cardinality.one
 
 
-def generate_schema(num_ent_classes_distr=between_sampler(2, 5),
-                    num_rel_classes_distr=between_sampler(2, 5),
-                    num_ent_classes_per_rel_class_distr=between_sampler(2, 3),
-                    num_attr_classes_per_ent_class_distr=between_sampler(2, 3),
-                    num_attr_classes_per_rel_class_distr=between_sampler(0, 0),
-                    cardinality_distr=cardinality_sampler(0.75)  # Cardinality sampler
-                    ) -> RelationalSchema:
+def generate_schema(
+    num_ent_classes_distr=between_sampler(2, 5),
+    num_rel_classes_distr=between_sampler(2, 5),
+    num_ent_classes_per_rel_class_distr=between_sampler(2, 3),
+    num_attr_classes_per_ent_class_distr=between_sampler(2, 3),
+    num_attr_classes_per_rel_class_distr=between_sampler(0, 0),
+    cardinality_distr=cardinality_sampler(0.75),  # Cardinality sampler
+) -> RelationalSchema:
     """A random relational schema.
 
     Notes
@@ -524,7 +596,10 @@ def generate_schema(num_ent_classes_distr=between_sampler(2, 5),
     for i in range(1, num_rel_classes + 1):
         n_e_r = num_ent_classes_per_rel_class_distr.sample()
         n_e_r = max(min(n_e_r, num_ent_classes), 2)
-        cards = {ent_classes[i]: cardinality_distr.sample() for i in choice(num_ent_classes, n_e_r, replace=False)}
+        cards = {
+            ent_classes[i]: cardinality_distr.sample()
+            for i in choice(num_ent_classes, n_e_r, replace=False)
+        }
         n_attr = num_attr_classes_per_rel_class_distr.sample()
         attrs = (AttributeClass("A" + str(next(attr_count))) for _ in range(n_attr))
         rel_classes.append(RelationshipClass("R" + str(i), attrs, cards))
@@ -533,7 +608,9 @@ def generate_schema(num_ent_classes_distr=between_sampler(2, 5),
     return RelationalSchema(ent_classes, rel_classes)
 
 
-def generate_skeleton(schema: RelationalSchema, min_items_per_class=300, max_degree=3) -> RelationalSkeleton:
+def generate_skeleton(
+    schema: RelationalSchema, min_items_per_class=300, max_degree=3
+) -> RelationalSkeleton:
     """A random relational skeleton
 
     Parameters
@@ -553,15 +630,20 @@ def generate_skeleton(schema: RelationalSchema, min_items_per_class=300, max_deg
 
     def entity_generator(E):
         while True:
-            yield SkItem('e' + str(next(c)), E)
+            yield SkItem("e" + str(next(c)), E)
 
     def rel_generator(R):
         while True:
-            yield SkItem('r' + str(next(c)), R)
+            yield SkItem("r" + str(next(c)), R)
 
-    gens = {**{E: entity_generator(E) for E in schema.entities}, **{R: rel_generator(R) for R in schema.relationships}}
-    n_nodes = {i: randint(min_items_per_class, round(1.2 * min_items_per_class))
-               for i in sorted(schema.item_classes)}
+    gens = {
+        **{E: entity_generator(E) for E in schema.entities},
+        **{R: rel_generator(R) for R in schema.relationships},
+    }
+    n_nodes = {
+        i: randint(min_items_per_class, round(1.2 * min_items_per_class))
+        for i in sorted(schema.item_classes)
+    }
 
     for R in sorted(schema.relationships):
         for E in sorted(R.entities):
@@ -588,7 +670,9 @@ def generate_skeleton(schema: RelationalSchema, min_items_per_class=300, max_deg
             counted = Counter([ne.item_class for ne in g.neighbors(e)])
             for R, count in counted.most_common():
                 if count > max_degree:
-                    neighbors_of_R = list(filter(lambda ne: ne.item_class == R, sorted(g.neighbors(e))))
+                    neighbors_of_R = list(
+                        filter(lambda ne: ne.item_class == R, sorted(g.neighbors(e)))
+                    )
                     to_remove = choice(neighbors_of_R, count - max_degree, replace=False)
                     g.remove_nodes_from(to_remove)
                     for r in to_remove:
@@ -621,16 +705,19 @@ def repeat_skeleton(skeleton: RelationalSkeleton, times) -> RelationalSkeleton:
     """A relational skeleton repeating the given relational skeleton given times."""
     new_skeleton = RelationalSkeleton(skeleton.schema, True)
     for i in range(times):
-        @functools.lru_cache(maxsize=None)
-        def ify(item0: SkItem):
-            return SkItem(str(i) + '_' + item0.name, item0.item_class)
+
+        @functools.cache
+        def ify(item0: SkItem, i=i):
+            return SkItem(str(i) + "_" + item0.name, item0.item_class)
 
         for item in sorted(skeleton.items()):
             if item.item_class.is_entity_class:
                 new_skeleton.add_entity(ify(item))
         for item in sorted(skeleton.items()):
             if item.item_class.is_relationship_class:
-                new_skeleton.add_relationship(ify(item), [ify(ne) for ne in skeleton.neighbors(item)])
+                new_skeleton.add_relationship(
+                    ify(item), [ify(ne) for ne in skeleton.neighbors(item)]
+                )
 
     return new_skeleton
 

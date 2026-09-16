@@ -1,5 +1,4 @@
 import collections
-import typing
 
 import networkx as nx
 
@@ -22,7 +21,7 @@ class PDAG:
     def __bool__(self):
         return bool(self.vertices())
 
-    def vertices(self) -> typing.Set:
+    def vertices(self) -> set:
         return set(self._Pa.keys()) | set(self._Ch.keys()) | self.aux_vert
 
     def __iter__(self):
@@ -31,7 +30,7 @@ class PDAG:
     def __contains__(self, item):
         return item in self.E or item in self.vertices()
 
-    def an(self, x, at=None) -> typing.Set:
+    def an(self, x, at=None) -> set:
         """Ancestors of x"""
         if at is None:
             at = set()
@@ -43,7 +42,7 @@ class PDAG:
 
         return at
 
-    def de(self, x, at=None) -> typing.Set:
+    def de(self, x, at=None) -> set:
         """Descendants of x"""
         if at is None:
             at = set()
@@ -55,7 +54,7 @@ class PDAG:
 
         return at
 
-    def oriented(self) -> typing.Set:
+    def oriented(self) -> set:
         """all oriented edges"""
         ors = set()
         for x, y in self.E:
@@ -63,7 +62,7 @@ class PDAG:
                 ors.add((x, y))
         return ors
 
-    def unoriented(self) -> typing.Set:
+    def unoriented(self) -> set:
         """all unoriented edges"""
         uors = set()
         for x, y in self.E:
@@ -89,7 +88,7 @@ class PDAG:
         if v in self.aux_vert:
             self.aux_vert.remove(v)
 
-    def copy(self) -> 'PDAG':
+    def copy(self) -> "PDAG":
         new_copy = PDAG()
         new_copy.E = set(self.E)
         new_copy._Pa = collections.defaultdict(set)
@@ -172,21 +171,21 @@ class PDAG:
         """Returns true if there exists a directed edge between x and y without orientation (i.e., x-->y or x<--y)."""
         return ((x, y) in self.E) ^ ((y, x) in self.E)
 
-    def ne(self, x) -> typing.Set:
+    def ne(self, x) -> set:
         """Neighbors -- connected through an undirected edge"""
         return self._Pa[x] & self._Ch[x]
 
-    def adj(self, x) -> typing.Set:
+    def adj(self, x) -> set:
         """Adjacencies -- connected through an (un)directed edge"""
         return self._Pa[x] | self._Ch[x]
 
     # get parents
-    def pa(self, x) -> typing.Set:
+    def pa(self, x) -> set:
         """Parents -- connected through a directed edge towards x"""
         return self._Pa[x] - self._Ch[x]
 
     # get children
-    def ch(self, x) -> typing.Set:
+    def ch(self, x) -> set:
         """Children -- connected through a directed edge from x"""
         return self._Ch[x] - self._Pa[x]
 
@@ -205,7 +204,7 @@ class PDAG:
         return ug
 
     def dag_admission(self) -> bool:
-        """ Whether there might exists a DAG admitting current PDAG """
+        """Whether there might exists a DAG admitting current PDAG"""
         from itertools import combinations
 
         pdag = self.copy()

@@ -1,14 +1,24 @@
 import functools
 from collections import defaultdict, namedtuple, deque
 from itertools import cycle, product, combinations
-from typing import Set, Optional, Union, Tuple, Generator, List, Sequence
+from typing import Optional
+from collections.abc import Generator, Sequence
 
 import networkx as nx
 import numpy as np
 from joblib import Parallel, delayed
 from numpy.random.mtrand import choice, shuffle, randint, randn
 
-from pyrcds.domain import EntityClass, RelationshipClass, ItemClass, RelationalSchema, AttributeClass, RelationalSkeleton, SkItem, ImmutableRSkeleton
+from pyrcds.domain import (
+    EntityClass,
+    RelationshipClass,
+    ItemClass,
+    RelationalSchema,
+    AttributeClass,
+    RelationalSkeleton,
+    SkItem,
+    ImmutableRSkeleton,
+)
 from pyrcds.graphs import PDAG
 from pyrcds.utils import average_agg, normal_sampler, group_by, linear_gaussian, unions
 
@@ -20,10 +30,15 @@ def is_valid_rpath(path) -> bool:
     ----------
     path : array_like of `I_Class`
     """
-    assert not isinstance(path, RelationalPath)
+    if isinstance(path, RelationalPath):
+        raise TypeError("Expected a plain sequence of item classes, not a RelationalPath")
     E, R = EntityClass, RelationshipClass
-    assert path is not None and len(path) >= 1
-    assert isinstance(path[0], E) or isinstance(path[0], R)
+    if path is None or len(path) < 1:
+        raise ValueError("Path must be a non-empty sequence of item classes")
+    if not (isinstance(path[0], E) or isinstance(path[0], R)):
+        raise TypeError(
+            f"Path must start with EntityClass or RelationshipClass, got {type(path[0])}"
+        )
 
     # alternating sequence
     if isinstance(path[0], E):
@@ -47,14 +62,16 @@ def is_valid_rpath(path) -> bool:
         ere, rer = zipped, shfited_zipped
     else:
         ere, rer = shfited_zipped, zipped
-    return all(e1 != e2 for e1, r, e2 in ere) and all(r1 != r2 or r1.is_many(e) for r1, e, r2 in rer)
+    return all(e1 != e2 for e1, r, e2 in ere) and all(
+        r1 != r2 or r1.is_many(e) for r1, e, r2 in rer
+    )
 
 
 @functools.total_ordering
 class RelationalPath:
     """Relational path"""
 
-    def __init__(self, item_classes: Union[ItemClass, List[ItemClass]], backdoor=False):
+    def __init__(self, item_classes: ItemClass | list[ItemClass], backdoor=False):
         """
 
         Parameters
@@ -68,7 +85,7 @@ class RelationalPath:
             item_classes = (item_classes,)
         if not backdoor:
             if not is_valid_rpath(item_classes):
-                raise ValueError('not a valid path: {}'.format(item_classes))
+                raise ValueError(f"not a valid path: {item_classes}")
         self.__item_classes = tuple(item_classes)
         self.__h = hash(self.__item_classes)
         # self.__getitem__ = functools.lru_cache(maxsize=10)(self.__getitem__)
@@ -80,9 +97,11 @@ class RelationalPath:
         return iter(self.__item_classes)
 
     def __eq__(self, other):
-        return isinstance(other, RelationalPath) and \
-               self.__h == other.__h and \
-               self.__item_classes == other.__item_classes
+        return (
+            isinstance(other, RelationalPath)
+            and self.__h == other.__h
+            and self.__item_classes == other.__item_classes
+        )
 
     def __bool__(self):
         return True
@@ -113,9 +132,9 @@ class RelationalPath:
                 return RelationalPath(self.__item_classes[start:stop], True)
 
         else:
-            raise ValueError('unknown {}'.format(item))
+            raise ValueError(f"unknown {item}")
 
-    def __pow__(self, other: 'RelationalPath') -> Optional['RelationalPath']:
+    def __pow__(self, other: "RelationalPath") -> Optional["RelationalPath"]:
         """Concatenate two paths."""
         if self.joinable(other):
             return self.join(other, True)
@@ -125,19 +144,19 @@ class RelationalPath:
     def is_canonical(self):
         return len(self.__item_classes) == 1
 
-    def subpath(self, start, end) -> 'RelationalPath':
+    def subpath(self, start, end) -> "RelationalPath":
         assert 0 <= start < end <= len(self)
         return RelationalPath(self.__item_classes[start:end])
 
-    def __reversed__(self) -> 'RelationalPath':
+    def __reversed__(self) -> "RelationalPath":
         return RelationalPath(tuple(reversed(self.__item_classes)), True)
 
-    def reverse(self) -> 'RelationalPath':
+    def reverse(self) -> "RelationalPath":
         return RelationalPath(tuple(reversed(self.__item_classes)), True)
 
     @property
     def hop_len(self) -> int:
-        """ Hop length is the edge length of a relational path """
+        """Hop length is the edge length of a relational path"""
         return len(self) - 1
 
     @property
@@ -151,7 +170,7 @@ class RelationalPath:
     def __len__(self):
         return len(self.__item_classes)
 
-    def appended_or_none(self, item_class: ItemClass) -> Optional['RelationalPath']:
+    def appended_or_none(self, item_class: ItemClass) -> Optional["RelationalPath"]:
         if len(self) > 1:
             if is_valid_rpath(self.__item_classes[-2:] + (item_class,)):
                 return RelationalPath(self.__item_classes + (item_class,), True)
@@ -164,20 +183,22 @@ class RelationalPath:
                     return RelationalPath(self.__item_classes + (item_class,), True)
         return None
 
-    def joinable(self, rpath: 'RelationalPath') -> bool:
+    def joinable(self, rpath: "RelationalPath") -> bool:
         if self.terminal != rpath.base:
             return False
         if len(self) > 1 and len(rpath) > 1:
-            return is_valid_rpath([self.__item_classes[-2], self.__item_classes[-1], rpath.__item_classes[1]])
+            return is_valid_rpath(
+                [self.__item_classes[-2], self.__item_classes[-1], rpath.__item_classes[1]]
+            )
         return True
 
-    def join(self, rpath: 'RelationalPath', backdoor=False) -> 'RelationalPath':
+    def join(self, rpath: "RelationalPath", backdoor=False) -> "RelationalPath":
         if not backdoor:
             assert self.joinable(rpath)
         return RelationalPath(self.__item_classes + rpath.__item_classes[1:], True)
 
     def __str__(self):
-        return '[' + (', '.join(str(i) for i in self.__item_classes)) + ']'
+        return "[" + (", ".join(str(i) for i in self.__item_classes)) + "]"
 
     def __repr__(self):
         return str(self)
@@ -211,12 +232,19 @@ def llrsp(p1: RelationalPath, p2: RelationalPath) -> int:
 class RelationalVariable:
     """Relational variable"""
 
-    def __init__(self, rpath: Union[RelationalPath, ItemClass, List[ItemClass]], attr: Union[str, AttributeClass]):
+    def __init__(
+        self,
+        rpath: RelationalPath | ItemClass | list[ItemClass],
+        attr: str | AttributeClass,
+    ):
         if not isinstance(rpath, RelationalPath):
             rpath = RelationalPath(rpath)
         if isinstance(attr, str):
             attr = AttributeClass(attr)
-        assert attr in rpath.terminal.attrs
+        if attr not in rpath.terminal.attrs:
+            raise ValueError(
+                f"Attribute {attr} is not an attribute of terminal item class {rpath.terminal}"
+            )
         self.rpath = rpath
         self.attr = attr
         self.__h = hash(self.rpath) ^ hash(self.attr)
@@ -246,23 +274,27 @@ class RelationalVariable:
         return self.__h
 
     def __eq__(self, other):
-        return isinstance(other, RelationalVariable) and \
-               self.__h == other.__h and \
-               self.rpath == other.rpath and \
-               self.attr == other.attr
+        return (
+            isinstance(other, RelationalVariable)
+            and self.__h == other.__h
+            and self.rpath == other.rpath
+            and self.attr == other.attr
+        )
 
     def __str__(self):
-        return str(self.rpath) + '.' + str(self.attr)
+        return str(self.rpath) + "." + str(self.attr)
 
     def __repr__(self):
         return str(self)
 
 
-def canonical_rvars(schema: RelationalSchema) -> Set[RelationalVariable]:
+def canonical_rvars(schema: RelationalSchema) -> set[RelationalVariable]:
     """Returns all canonical relational variables given schema"""
-    return set(RelationalVariable(RelationalPath(item_class), attr)
-               for item_class in schema.item_classes
-               for attr in item_class.attrs)
+    return set(
+        RelationalVariable(RelationalPath(item_class), attr)
+        for item_class in schema.item_classes
+        for attr in item_class.attrs
+    )
 
 
 @functools.total_ordering
@@ -280,9 +312,11 @@ class RelationalDependency:
         return self.__h
 
     def __eq__(self, other):
-        return isinstance(other, RelationalDependency) and \
-               self.cause == other.cause and \
-               self.effect == other.effect
+        return (
+            isinstance(other, RelationalDependency)
+            and self.cause == other.cause
+            and self.effect == other.effect
+        )
 
     def __le__(self, other):
         return (self.cause, self.effect) <= (other.cause, other.effect)
@@ -298,24 +332,24 @@ class RelationalDependency:
         return len(self) - 1
 
     # reversed(P.X --> Vy) = ~P.Y --> Vx
-    def __reversed__(self) -> 'RelationalDependency':
+    def __reversed__(self) -> "RelationalDependency":
         new_cause = RelationalVariable(self.cause.rpath.reverse(), self.effect.attr)
         new_effect = RelationalVariable(RelationalPath(self.cause.terminal), self.cause.attr)
         return RelationalDependency(new_cause, new_effect)
 
-    def opposite(self) -> 'RelationalDependency':
+    def opposite(self) -> "RelationalDependency":
         new_cause = RelationalVariable(self.cause.rpath.reverse(), self.effect.attr)
         new_effect = RelationalVariable(RelationalPath(self.cause.terminal), self.cause.attr)
         return RelationalDependency(new_cause, new_effect)
 
-    def reverse(self) -> 'RelationalDependency':  # alias
+    def reverse(self) -> "RelationalDependency":  # alias
         new_cause = RelationalVariable(self.cause.rpath.reverse(), self.effect.attr)
         new_effect = RelationalVariable(RelationalPath(self.cause.terminal), self.cause.attr)
         return RelationalDependency(new_cause, new_effect)
 
     # dual(P.X --> Vy) = (Vx, ~P.Y)
     @property
-    def dual(self) -> Tuple[RelationalVariable, RelationalVariable]:
+    def dual(self) -> tuple[RelationalVariable, RelationalVariable]:
         new_cause = RelationalVariable(self.cause.rpath.reverse(), self.effect.attr)
         new_effect = RelationalVariable(RelationalPath(self.cause.terminal), self.cause.attr)
         return new_effect, new_cause
@@ -341,9 +375,10 @@ class SymTriple:
         return (hash(self.left) + hash(self.right)) ^ hash(self.middle)
 
     def __eq__(self, other):
-        return isinstance(other, SymTriple) and \
-               ((self.left, self.right, self.middle) == (other.left, other.right, other.middle) or
-                (self.right, self.left, self.middle) == (other.left, other.right, other.middle))
+        return isinstance(other, SymTriple) and (
+            (self.left, self.right, self.middle) == (other.left, other.right, other.middle)
+            or (self.right, self.left, self.middle) == (other.left, other.right, other.middle)
+        )
 
     def __iter__(self):
         return iter((self.left, self.middle, self.right))
@@ -356,7 +391,7 @@ class SymTriple:
         return SymTriple(self.right, self.middle, self.left)
 
     def __str__(self):
-        return '<' + (', '.join(str(t) for t in (self.left, self.middle, self.right))) + '>'
+        return "<" + (", ".join(str(t) for t in (self.left, self.middle, self.right))) + ">"
 
     def __repr__(self):
         return f"SymTriple({(', '.join(str(t) for t in (self.left, self.middle, self.right)))})"
@@ -428,8 +463,9 @@ class PRCM:
 
     @property
     def full_dependencies(self):
-        return {d_ for d in self.directed_dependencies for d_ in (d, (d.reverse()))} | \
-               {d for u in self.undirected_dependencies for d in u}
+        return {d_ for d in self.directed_dependencies for d_ in (d, (d.reverse()))} | {
+            d for u in self.undirected_dependencies for d in u
+        }
 
     @property
     def degree(self) -> int:
@@ -441,16 +477,16 @@ class PRCM:
         """
         return max(len(self.adj(v)) for v in (self.parents.keys() | self.neighbors.keys()))
 
-    def pa(self, rvar: RelationalVariable) -> Set[RelationalVariable]:
+    def pa(self, rvar: RelationalVariable) -> set[RelationalVariable]:
         return self.parents[rvar]
 
-    def ch(self, rvar: RelationalVariable) -> Set[RelationalVariable]:
+    def ch(self, rvar: RelationalVariable) -> set[RelationalVariable]:
         return self.children[rvar]
 
-    def ne(self, rvar: RelationalVariable) -> Set[RelationalVariable]:
+    def ne(self, rvar: RelationalVariable) -> set[RelationalVariable]:
         return self.neighbors[rvar]
 
-    def adj(self, rvar: RelationalVariable) -> Set[RelationalVariable]:
+    def adj(self, rvar: RelationalVariable) -> set[RelationalVariable]:
         return self.neighbors[rvar] | self.parents[rvar] | self.children[rvar]
 
     @property
@@ -462,8 +498,16 @@ class PRCM:
         int
             -1 if there is no dependency
         """
-        a = max(len(v) for k, vs in self.parents.items() for v in vs) if self.directed_dependencies else 0
-        b = max(len(v) for k, vs in self.neighbors.items() for v in vs) if self.undirected_dependencies else 0
+        a = (
+            max(len(v) for k, vs in self.parents.items() for v in vs)
+            if self.directed_dependencies
+            else 0
+        )
+        b = (
+            max(len(v) for k, vs in self.neighbors.items() for v in vs)
+            if self.undirected_dependencies
+            else 0
+        )
         return -1 + max(a, b)
 
     # TODO make it as a member variable
@@ -478,7 +522,9 @@ class PRCM:
 
         cdg = PDAG()
         cdg.add_nodes(self.schema.attrs)
-        cdg.add_edges((cause.attr, effect.attr) for effect, causes in self.parents.items() for cause in causes)
+        cdg.add_edges(
+            (cause.attr, effect.attr) for effect, causes in self.parents.items() for cause in causes
+        )
         cdg.add_undirected_edges((k.attr, v.attr) for k, vs in self.neighbors.items() for v in vs)
 
         return cdg
@@ -490,9 +536,9 @@ class PRCM:
             if d in self.directed_dependencies:
                 return
             if UndirectedRDep(d) in self.undirected_dependencies:
-                raise ValueError('undirected dependency exists for {}'.format(d))
+                raise ValueError(f"undirected dependency exists for {d}")
             if d.reverse() in self.directed_dependencies:
-                raise ValueError('opposite-directed dependency exists for {}'.format(d))
+                raise ValueError(f"opposite-directed dependency exists for {d}")
             self.parents[effect].add(cause)
             dual_cause, dual_effect = d.dual
             self.children[dual_cause].add(dual_effect)
@@ -502,9 +548,9 @@ class PRCM:
             if d in self.undirected_dependencies:
                 return
             if d1 in self.directed_dependencies:
-                raise ValueError('directed dependency {} exists'.format(d1))
+                raise ValueError(f"directed dependency {d1} exists")
             if d2 in self.directed_dependencies:
-                raise ValueError('directed dependency {} exists'.format(d2))
+                raise ValueError(f"directed dependency {d2} exists")
             self.neighbors[d1.effect].add(d1.cause)
             self.neighbors[d2.effect].add(d2.cause)
             self.undirected_dependencies.add(d)
@@ -553,9 +599,11 @@ class PRCM:
                         break
 
     def __eq__(self, other):
-        return isinstance(other, PRCM) and \
-               self.directed_dependencies == other.directed_dependencies and \
-               self.undirected_dependencies == other.undirected_dependencies
+        return (
+            isinstance(other, PRCM)
+            and self.directed_dependencies == other.directed_dependencies
+            and self.undirected_dependencies == other.undirected_dependencies
+        )
 
 
 class RCM(PRCM):
@@ -569,8 +617,12 @@ class RCM(PRCM):
         super().add(d)
 
     def to_code(self):
-        joined = ', '.join([f"RelationalDependency(RelationalVariable({str(d.cause.rpath)},'{d.cause.attr.name}'), RelationalVariable({str(d.effect.rpath)},'{d.effect.attr.name}'))" for d in
-                            self.directed_dependencies])
+        joined = ", ".join(
+            [
+                f"RelationalDependency(RelationalVariable({str(d.cause.rpath)},'{d.cause.attr.name}'), RelationalVariable({str(d.effect.rpath)},'{d.effect.attr.name}'))"
+                for d in self.directed_dependencies
+            ]
+        )
         return "rcm = RCM(schema, {" + joined + "})"
 
 
@@ -582,7 +634,9 @@ class ParamRCM(RCM):
         self.functions = functions
 
 
-def terminal_set(skeleton: RelationalSkeleton, rpath, base_item: SkItem, semantics='path') -> Set[SkItem]:
+def terminal_set(
+    skeleton: RelationalSkeleton, rpath, base_item: SkItem, semantics="path"
+) -> set[SkItem]:
     """A terminal set of given relational path from the base item on the given relational skeleton.
 
     Parameters
@@ -592,7 +646,7 @@ def terminal_set(skeleton: RelationalSkeleton, rpath, base_item: SkItem, semanti
     skeleton
     semantics : {'path', 'bridge-burning'}
     """
-    if semantics == 'bridge-burning':
+    if semantics == "bridge-burning":
         return terminal_set_bbs(skeleton, rpath, base_item)
 
     if isinstance(rpath, RelationalDependency):
@@ -600,7 +654,7 @@ def terminal_set(skeleton: RelationalSkeleton, rpath, base_item: SkItem, semanti
     elif isinstance(rpath, RelationalVariable):
         rpath = rpath.rpath
     if not isinstance(rpath, RelationalPath):
-        raise TypeError('{} is not RPath but {}'.format(rpath, type(rpath)))
+        raise TypeError(f"{rpath} is not RPath but {type(rpath)}")
     assert rpath[0] == base_item.item_class
     item_paths = [[base_item]]
     next_paths = []
@@ -610,7 +664,13 @@ def terminal_set(skeleton: RelationalSkeleton, rpath, base_item: SkItem, semanti
     for item_class in iterator:
         for item_path in item_paths:
             next_items = skeleton.neighbors(item_path[-1], item_class) - set(item_path)
-            next_paths += [item_path + [item, ] for item in next_items]
+            next_paths += [
+                item_path
+                + [
+                    item,
+                ]
+                for item in next_items
+            ]
 
         if not next_paths:
             return set()
@@ -628,7 +688,7 @@ def terminal_set_bbs(skeleton: RelationalSkeleton, rpath: RelationalPath, base_i
     elif isinstance(rpath, RelationalVariable):
         rpath = rpath.rpath
     if not isinstance(rpath, RelationalPath):
-        raise TypeError('{} is not RPath but {}'.format(rpath, type(rpath)))
+        raise TypeError(f"{rpath} is not RPath but {type(rpath)}")
     assert rpath[0] == base_item.item_class
     Pi = {base_item}
     previouses = set(Pi)
@@ -638,7 +698,14 @@ def terminal_set_bbs(skeleton: RelationalSkeleton, rpath: RelationalPath, base_i
     return Pi
 
 
-def flatten(skeleton: RelationalSkeleton, rvars, with_base_items=False, value_only=False, n_jobs=1, verbose=False):
+def flatten(
+    skeleton: RelationalSkeleton,
+    rvars,
+    with_base_items=False,
+    value_only=False,
+    n_jobs=1,
+    verbose=False,
+):
     rvars = list(rvars)
     assert len({rvar.base for rvar in rvars}) == 1
     base_class = rvars[0].base
@@ -648,7 +715,10 @@ def flatten(skeleton: RelationalSkeleton, rvars, with_base_items=False, value_on
     if with_base_items:
         data[:, 0] = base_items
 
-    inner_data = Parallel(n_jobs, verbose=5 if verbose else 0)(delayed(__inner_flatten)(skeleton, rvar, base_items, value_only) for j, rvar in enumerate(rvars, start=1 if with_base_items else 0))
+    inner_data = Parallel(n_jobs, verbose=5 if verbose else 0)(
+        delayed(__inner_flatten)(skeleton, rvar, base_items, value_only)
+        for j, rvar in enumerate(rvars, start=1 if with_base_items else 0)
+    )
 
     shift = 1 if with_base_items else 0
     for j in range(len(rvars)):
@@ -674,7 +744,9 @@ class SkeletonDataInterface:
     Internally uses an LRU cache for the faster retrieval of repeated requests.
     """
 
-    def __init__(self, skeleton: RelationalSkeleton, *, cache_maxsize=128, to_shuffle=True, skip_copy=False):
+    def __init__(
+        self, skeleton: RelationalSkeleton, *, cache_maxsize=128, to_shuffle=True, skip_copy=False
+    ):
         self.skeleton = skeleton if skip_copy else ImmutableRSkeleton(skeleton)
         self.base_items = dict()
         for ic in sorted(self.skeleton.schema.item_classes):
@@ -687,7 +759,9 @@ class SkeletonDataInterface:
         # enable lru cache
         self.inner_flatten = functools.lru_cache(maxsize=cache_maxsize)(self.inner_flatten)
 
-    def flatten(self, rvars: Sequence[RelationalVariable], with_base_items=False, value_only=False) -> np.ndarray:
+    def flatten(
+        self, rvars: Sequence[RelationalVariable], with_base_items=False, value_only=False
+    ) -> np.ndarray:
         """Relational data as a table where columns corresponding to rvars. If with_base_items set True, base items are used as an index (the first column)
 
         Returns a numpy array where there are columns corresponding to given relational variables (`rvars`) together.
@@ -696,7 +770,9 @@ class SkeletonDataInterface:
         """
         assert rvars, "rvars cannot be empty."
         rvars = tuple(rvars)
-        assert len({rvar.base for rvar in rvars}) == 1, "Relational variables do not share the same base class: {}".format(rvars)
+        assert len({rvar.base for rvar in rvars}) == 1, (
+            f"Relational variables do not share the same base class: {rvars}"
+        )
         base_class = rvars[0].base
         base_items = self.base_items[base_class]
 
@@ -730,19 +806,25 @@ class SkeletonDataInterface:
                     inner_data[i] = tuple(item[rvar.attr] for item in terminal)
             else:
                 if sort:
-                    inner_data[i] = tuple(sorted(((item, item[rvar.attr]) for item in terminal), key=lambda iv: iv[1]))
+                    inner_data[i] = tuple(
+                        sorted(((item, item[rvar.attr]) for item in terminal), key=lambda iv: iv[1])
+                    )
                 else:
                     inner_data[i] = tuple((item, item[rvar.attr]) for item in terminal)
         return inner_data
 
     def fetch_singleton(self, rvar: RelationalVariable) -> np.ndarray:
-        """ a numpy array of attribute values ordered following `self.base_items` """
+        """a numpy array of attribute values ordered following `self.base_items`"""
         assert rvar.is_canonical
-        return np.array([next(iter(terminal_set(self.skeleton, rvar.rpath, b)))[rvar.attr]
-                         for b in self.base_items[rvar.base]])
+        return np.array(
+            [
+                next(iter(terminal_set(self.skeleton, rvar.rpath, b)))[rvar.attr]
+                for b in self.base_items[rvar.base]
+            ]
+        )
 
 
-ItemAttribute = namedtuple('ItemAttribute', ['item', 'attr'])
+ItemAttribute = namedtuple("ItemAttribute", ["item", "attr"])
 
 
 class GroundGraph:
@@ -768,14 +850,18 @@ class GroundGraph:
         for base_item_class, rdeps in group_by(as_rdeps, k_fun):
             for base_item, rdep in product(skeleton.items(base_item_class), rdeps):
                 for dest_item in terminal_set(skeleton, rdep.cause.rpath, base_item):
-                    self.g.add_undirected_edge(ItemAttribute(dest_item, rdep.cause.attr),
-                                               ItemAttribute(base_item, rdep.effect.attr))
+                    self.g.add_undirected_edge(
+                        ItemAttribute(dest_item, rdep.cause.attr),
+                        ItemAttribute(base_item, rdep.effect.attr),
+                    )
 
         for base_item_class, rdeps in group_by(rcm.directed_dependencies, k_fun):
             for base_item, rdep in product(skeleton.items(base_item_class), rdeps):
                 for dest_item in terminal_set(skeleton, rdep.cause.rpath, base_item):
-                    self.g.add_edge(ItemAttribute(dest_item, rdep.cause.attr),
-                                    ItemAttribute(base_item, rdep.effect.attr))
+                    self.g.add_edge(
+                        ItemAttribute(dest_item, rdep.cause.attr),
+                        ItemAttribute(base_item, rdep.effect.attr),
+                    )
 
         included = set(self.g.vertices())
         for skitem in self.skeleton.items():
@@ -824,12 +910,15 @@ def generate_rpath(schema: RelationalSchema, base: ItemClass = None, length=None
     -----
     The length is the upper bound of the generated relational path.
     """
-    assert length is not None and 1 <= length
+    if length is None or length < 1:
+        raise ValueError(f"length must be a positive integer, got {length}")
     if base is None:
         base = choice(sorted(schema.entities | schema.relationships))
     assert base in schema
 
-    rpath_inner = [base, ]
+    rpath_inner = [
+        base,
+    ]
     curr_item = base
     prev_item = None
     while len(rpath_inner) < length:
@@ -925,8 +1014,10 @@ def generate_values_for_skeleton(rcm: ParamRCM, skeleton: RelationalSkeleton, se
         causes = rcm.pa(effect)
 
         for base_item in sorted(skeleton.items(base_item_class)):
-            cause_item_attrs = {cause: _item_attributes(terminal_set(skeleton, cause.rpath, base_item), cause.attr)
-                                for cause in causes}
+            cause_item_attrs = {
+                cause: _item_attributes(terminal_set(skeleton, cause.rpath, base_item), cause.attr)
+                for cause in causes
+            }
 
             v = rcm.functions[effect](skeleton, cause_item_attrs)
             skeleton[(base_item, attr)] = v
@@ -955,8 +1046,10 @@ def linear_gaussians_rcm(rcm: RCM, seed=None) -> ParamRCM:
         np.random.seed(seed)
 
     functions = dict()
-    effects = [RelationalVariable(RelationalPath(rcm.schema.item_class_of(attr)), attr)
-               for attr in sorted(rcm.schema.attrs)]
+    effects = [
+        RelationalVariable(RelationalPath(rcm.schema.item_class_of(attr)), attr)
+        for attr in sorted(rcm.schema.attrs)
+    ]
 
     for e in effects:
         parameters = {cause: 1.0 + 0.1 * abs(randn()) for cause in sorted(rcm.pa(e))}
@@ -967,17 +1060,19 @@ def linear_gaussians_rcm(rcm: RCM, seed=None) -> ParamRCM:
 
 def __validate_item_class(base_item_class: ItemClass, schema: RelationalSchema):
     if not isinstance(base_item_class, ItemClass):
-        raise TypeError('{} is not a valid item class.'.format(type(base_item_class)))
+        raise TypeError(f"{type(base_item_class)} is not a valid item class.")
     if base_item_class not in schema:
-        raise ValueError('{} is not in the relational schema.'.format(base_item_class))
+        raise ValueError(f"{base_item_class} is not in the relational schema.")
 
 
 def __validate_hop(hop):
-    if 0 > hop:
-        raise ValueError('Hop must be a non-negative integer. Received {}'.format(hop))
+    if hop < 0:
+        raise ValueError(f"Hop must be a non-negative integer. Received {hop}")
 
 
-def enumerate_rpaths(schema: RelationalSchema, hop: int, base_item_class=None) -> Generator[RelationalPath, None, None]:
+def enumerate_rpaths(
+    schema: RelationalSchema, hop: int, base_item_class=None
+) -> Generator[RelationalPath, None, None]:
     """Returns a generator that enumerates all valid relational paths up to the given hop starting with the specified base item class, if given."""
     __validate_hop(hop)
     if base_item_class:
@@ -987,16 +1082,23 @@ def enumerate_rpaths(schema: RelationalSchema, hop: int, base_item_class=None) -
     if base_item_class is not None:
         Ps.append(RelationalPath(base_item_class))
     else:
-        Ps.extend((RelationalPath(ic) for ic in schema.item_classes))
+        Ps.extend(RelationalPath(ic) for ic in schema.item_classes)
 
     while Ps:
         P = Ps.pop()
         yield P
         if P.hop_len < hop:
-            Ps.extend(filter(lambda x: x is not None, (P.appended_or_none(i) for i in schema.relateds(P.terminal))))
+            Ps.extend(
+                filter(
+                    lambda x: x is not None,
+                    (P.appended_or_none(i) for i in schema.relateds(P.terminal)),
+                )
+            )
 
 
-def enumerate_rvars(schema: RelationalSchema, hop: int) -> Generator[RelationalVariable, None, None]:
+def enumerate_rvars(
+    schema: RelationalSchema, hop: int
+) -> Generator[RelationalVariable, None, None]:
     """Returns a generator that enumerates all valid relational variables up to the given hop."""
 
     __validate_hop(hop)
@@ -1024,4 +1126,7 @@ def enumerate_rdeps(schema: RelationalSchema, hop) -> Generator[RelationalDepend
             for cause_attr in P.terminal.attrs:
                 for effect_attr in base_item_class.attrs:
                     if effect_attr != cause_attr:
-                        yield RelationalDependency(c[RelationalVariable(P, cause_attr)], c[RelationalVariable(base_item_class, effect_attr)])
+                        yield RelationalDependency(
+                            c[RelationalVariable(P, cause_attr)],
+                            c[RelationalVariable(base_item_class, effect_attr)],
+                        )

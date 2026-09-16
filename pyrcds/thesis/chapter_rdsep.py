@@ -2,8 +2,22 @@ from itertools import combinations
 
 import numpy as np
 
-from pyrcds.domain import generate_schema, cardinality_sampler, RelationshipClass, Cardinality, EntityClass, RelationalSchema, AttributeClass
-from pyrcds.model import enumerate_rpaths, RelationalPath, RelationalVariable, RelationalDependency, RCM
+from pyrcds.domain import (
+    generate_schema,
+    cardinality_sampler,
+    RelationshipClass,
+    Cardinality,
+    EntityClass,
+    RelationalSchema,
+    AttributeClass,
+)
+from pyrcds.model import (
+    enumerate_rpaths,
+    RelationalPath,
+    RelationalVariable,
+    RelationalDependency,
+    RCM,
+)
 from pyrcds.rcds import new_extend, extend, AbstractGroundGraph, intersectable, co_intersectable
 
 
@@ -30,9 +44,13 @@ def test_co_intersectable_working():
             continue
         ic_P, ic_R, ic_terminal = np.random.choice(ics, 3)
         rpaths = list(enumerate_rpaths(schema, 8))
-        P_candidates = [rpath for rpath in rpaths if rpath.base == ic_P and rpath.terminal == ic_terminal]
+        P_candidates = [
+            rpath for rpath in rpaths if rpath.base == ic_P and rpath.terminal == ic_terminal
+        ]
         Q_candidates = [rpath for rpath in rpaths if rpath.base == ic_P and rpath.terminal == ic_R]
-        R_candidates = [rpath for rpath in rpaths if rpath.base == ic_R and rpath.terminal == ic_terminal]
+        R_candidates = [
+            rpath for rpath in rpaths if rpath.base == ic_R and rpath.terminal == ic_terminal
+        ]
         np.random.shuffle(P_candidates)
         np.random.shuffle(Q_candidates)
         np.random.shuffle(R_candidates)
@@ -54,7 +72,7 @@ def test_co_intersectable_working():
                     np.random.shuffle(P_candidates)
                     passed = 0
                     for P_prime in P_candidates:
-                        if P == P_prime:
+                        if P_prime == P:
                             continue
                         if intersectable(P, P_prime):
                             co_intersectable(Q, R, P, P_prime, schema)
@@ -64,16 +82,16 @@ def test_co_intersectable_working():
 
 
 def test_agg_non_completeness():
-    """ Check the non-completeness of revised AGG for relational d-separation """
-    X, Y, Z = [AttributeClass(_) for _ in ('X', 'Y', 'Z')]
-    E1 = EntityClass('E1')
-    E2 = EntityClass('E2', Y)
-    E3 = EntityClass('E3', X)
-    E4 = EntityClass('E4')
-    E5 = EntityClass('E5', Z)
-    R1 = RelationshipClass('R1', set(), {e: Cardinality.one for e in {E1, E2, E4}})
-    R2 = RelationshipClass('R2', set(), {e: Cardinality.one for e in {E2, E3}})
-    R3 = RelationshipClass('R3', set(), {e: Cardinality.one for e in {E3, E4, E5}})
+    """Check the non-completeness of revised AGG for relational d-separation"""
+    X, Y, Z = [AttributeClass(_) for _ in ("X", "Y", "Z")]
+    E1 = EntityClass("E1")
+    E2 = EntityClass("E2", Y)
+    E3 = EntityClass("E3", X)
+    E4 = EntityClass("E4")
+    E5 = EntityClass("E5", Z)
+    R1 = RelationshipClass("R1", set(), {e: Cardinality.one for e in {E1, E2, E4}})
+    R2 = RelationshipClass("R2", set(), {e: Cardinality.one for e in {E2, E3}})
+    R3 = RelationshipClass("R3", set(), {e: Cardinality.one for e in {E3, E4, E5}})
 
     schema = RelationalSchema([E1, E2, E3, E4, E5], [R1, R2, R3])
 

@@ -1,0 +1,61 @@
+[build-system]
+requires = ["setuptools>=61.0.0", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "pyRCDs"
+dynamic = ["version"]
+description = "Relational Causal Model and Tools"
+readme = "README.md"
+authors = [
+    { name = "Sanghack Lee", email = "sanghack.lee@gmail.com" }
+]
+requires-python = ">=3.12"
+dependencies = [
+    "tqdm",
+    "networkx>=2.1",
+    "numpy",
+    "joblib",
+    "pygraphviz"
+]
+
+[project.optional-dependencies]
+test = [
+    "pytest>=8.0",
+    "pytest-cov",
+    "mypy",
+    "matplotlib",
+    "seaborn"
+]
+dev = [
+    "ruff",
+    "mypy",
+    "pytest>=8.0",
+    "pytest-cov"
+]
+
+[tool.setuptools.dynamic]
+version = {attr = "pyrcds.__version__"}
+
+[tool.setuptools.packages.find]
+include = ["pyrcds", "pyrcds.*"]
+
+[tool.ruff]
+line-length = 100
+target-version = "py312"
+
+[tool.ruff.lint]
+select = ["E", "F", "B"]
+extend-ignore = ["E741", "F403", "F405", "B017", "B008", "B905", "E501", "B007", "B011"]
+
+[tool.mypy]
+ignore_missing_imports = true
+strict_optional = false
+disable_error_code = ["assignment", "has-type", "misc", "call-arg", "var-annotated", "operator", "call-overload", "attr-defined", "type-arg", "dict-item", "index", "list-item", "name-defined", "no-redef", "type-var", "arg-type"]
+
+[tool.pytest.ini_options]
+minversion = "6.0"
+addopts = "-ra -q --cov=pyrcds --cov-report=term-missing --cov-report=xml"
+testpaths = [
+    "pyrcds/tests",
+]
