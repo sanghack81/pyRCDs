@@ -9,6 +9,12 @@
 
 It also includes utilities for path semantics and theoretical evaluation. For structure learning from data, see [`RRCD`](https://github.com/sanghack81/RRCD) [[5](#5)].
 
+## RpCD erratum
+
+The `RpCD` learner and `markov_equivalence` use the original canonical unshielded triple (CUT) construction.
+The [CUT erratum (author review pending)](https://www.sanghacklee.me/ai-corrected/RpCD_CUT_AI_corrected_2026-11-27.pdf) documents the counterexample.
+The [Open Causal Science companion](https://github.com/snu-causality-lab/open-causal-science/blob/51af06a9f7e0691cbfcc7e9fee8f81c0be8d6f29/docs/papers/lee-honavar-2016-rpcd.md) gives the Lean proof for the corrected reference learner under an exact relational conditional independence oracle.
+
 ## Installation
 
 We recommend using Python 3.12 or newer. Since visual abstractions rely on `pygraphviz`, you need the `graphviz` C-library installed natively on your system.
